@@ -9,6 +9,52 @@
         AllowsTransparency="True"
         WindowStyle="None">
 
+    <Window.Resources>
+        <Style x:Key="ToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="32" Height="18">
+                            <Border x:Name="Background" CornerRadius="9" Background="#E8E8E8" Cursor="Hand"/>
+                            <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="7" Background="White" 
+                                    HorizontalAlignment="Left" Margin="2,0,0,0">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="ThumbTransform" X="0"/>
+                                </Border.RenderTransform>
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="2" ShadowDepth="0.5" Opacity="0.15" Color="Black"/>
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Background" Property="Background" Value="#34C759"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform" 
+                                                           Storyboard.TargetProperty="X"
+                                                           To="16" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform" 
+                                                           Storyboard.TargetProperty="X"
+                                                           To="0" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Border Background="#F5F5F7" CornerRadius="14" BorderBrush="#E8E8E8" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
@@ -51,11 +97,25 @@
                     <TextBlock Text="模型名称" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
                     <TextBox x:Name="ModelTextBox" FontSize="12" Padding="10,8" Background="White" BorderBrush="#E8E8E8" BorderThickness="1" Margin="0,0,0,12"/>
 
-                    <CheckBox x:Name="StreamingCheckBox" Content="使用流式回复" FontSize="12" Foreground="#3D3D3D" Margin="0,0,0,10" Cursor="Hand"/>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="使用流式回复" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                        <CheckBox x:Name="StreamingCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                    </Grid>
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="开启工具调用能力（实验性）" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                        <CheckBox x:Name="EnableToolCallsCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                    </Grid>
 
-                    <CheckBox x:Name="EnableToolCallsCheckBox" Content="开启工具调用能力（实验性）" FontSize="12" Foreground="#3D3D3D" Margin="0,0,0,20" Cursor="Hand"/>
-
-                    <TextBlock Text="人格设定" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
+                    <TextBlock Text="人格设定" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,20,0,12"/>
 
                     <TextBlock Text="System Prompt" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
                     <TextBox x:Name="SystemPromptTextBox" FontSize="12" Padding="10,8" Background="White" BorderBrush="#E8E8E8" BorderThickness="1" 

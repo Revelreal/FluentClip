@@ -9,6 +9,71 @@
         AllowsTransparency="True"
         WindowStyle="None">
 
+    <Window.Resources>
+        <Style x:Key="ToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="32" Height="18">
+                            <Border x:Name="Background" CornerRadius="9" Background="#E8E8E8" Cursor="Hand"/>
+                            <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="7" Background="White" 
+                                    HorizontalAlignment="Left" Margin="2,0,0,0">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="ThumbTransform" X="0"/>
+                                </Border.RenderTransform>
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="2" ShadowDepth="0.5" Opacity="0.15" Color="Black"/>
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Background" Property="Background" Value="#34C759"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform" 
+                                                           Storyboard.TargetProperty="X"
+                                                           To="16" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform" 
+                                                           Storyboard.TargetProperty="X"
+                                                           To="0" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <Style x:Key="PillRadio" TargetType="RadioButton">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Background" CornerRadius="16" Background="#E8E8E8" Padding="12,6" Cursor="Hand">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Background" Property="Background" Value="#007AFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#3D3D3D"/>
+        </Style>
+    </Window.Resources>
+
     <Border Background="#F5F5F7" CornerRadius="14" BorderBrush="#E8E8E8" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
@@ -34,26 +99,48 @@
                     <TextBlock Text="通用" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
 
                     <StackPanel Margin="0,0,0,20">
-                        <CheckBox x:Name="AutoStartCheckBox" Content="开机自启动" FontSize="13" 
-                                  Foreground="#3D3D3D" Margin="0,0,0,10" Cursor="Hand"/>
-                        <CheckBox x:Name="MinimizeToTrayCheckBox" Content="最小化到系统托盘" FontSize="13" 
-                                  Foreground="#3D3D3D" Margin="0,0,0,10" Cursor="Hand"/>
-                        <CheckBox x:Name="RunInBackgroundCheckBox" Content="关闭时保持后台运行" FontSize="13" 
-                                  Foreground="#3D3D3D" Cursor="Hand"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="开机自启动" FontSize="13" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="AutoStartCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="最小化到系统托盘" FontSize="13" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="MinimizeToTrayCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="关闭时保持后台运行" FontSize="13" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="RunInBackgroundCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                        </Grid>
                     </StackPanel>
 
                     <TextBlock Text="剪贴板" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
 
                     <StackPanel Margin="0,0,0,20">
-                        <CheckBox x:Name="MonitorClipboardCheckBox" Content="监控系统剪贴板" FontSize="13" 
-                                  Foreground="#3D3D3D" Margin="0,0,0,10" Cursor="Hand"/>
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="监控系统剪贴板" FontSize="13" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="MonitorClipboardCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand"/>
+                        </Grid>
                         
                         <TextBlock Text="拖入文件行为:" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,8"/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <RadioButton x:Name="DragCopyRadio" Content="仅保存副本（复制）" FontSize="12" 
-                                         Foreground="#3D3D3D" Margin="0,0,16,0" Cursor="Hand" GroupName="DragAction"/>
-                            <RadioButton x:Name="DragCutRadio" Content="剪切原文件" FontSize="12" 
-                                         Foreground="#3D3D3D" Cursor="Hand" GroupName="DragAction"/>
+                            <RadioButton x:Name="DragCopyRadio" Style="{StaticResource PillRadio}" Content="仅复制" Margin="0,0,8,0" Cursor="Hand" GroupName="DragAction"/>
+                            <RadioButton x:Name="DragCutRadio" Style="{StaticResource PillRadio}" Content="剪切" Cursor="Hand" GroupName="DragAction"/>
                         </StackPanel>
                     </StackPanel>
 

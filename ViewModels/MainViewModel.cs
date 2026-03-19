@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentClip.Models;
@@ -53,10 +54,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
                         
                         if (!IsDuplicateFiles(fileArray))
                         {
+                            var firstFile = fileArray[0];
+                            var ext = System.IO.Path.GetExtension(firstFile)?.ToLowerInvariant();
+                            var audioExts = new[] { ".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a" };
+                            
+                            BitmapSource? albumArt = null;
+                            string? artist = null;
+                            
+                            if (audioExts.Contains(ext))
+                            {
+                                var metadata = ThumbnailHelper.ExtractAudioMetadata(firstFile);
+                                if (metadata.HasValue)
+                                {
+                                    artist = metadata.Value.Artist;
+                                    albumArt = metadata.Value.AlbumArt;
+                                }
+                            }
+                            
+                            var thumbnail = albumArt ?? ThumbnailHelper.GenerateThumbnail(firstFile);
+                            
                             var item = new ClipboardItem
                             {
                                 ItemType = ClipboardItemType.File,
                                 FilePaths = fileArray,
+                                Thumbnail = thumbnail,
+                                Artist = artist,
+                                AlbumArt = albumArt,
                                 Timestamp = DateTime.Now
                             };
                             ClipboardItems.Insert(0, item);
