@@ -42,6 +42,77 @@ public class AgentService
 
     private const int MaxTokens = 100000;
 
+    public void LoadChatHistory()
+    {
+        try
+        {
+            var chatData = StorageService.Instance.LoadChatHistory();
+            _conversationHistory.Clear();
+
+            foreach (var chatMsg in chatData.Messages)
+            {
+                _conversationHistory.Add(new Message
+                {
+                    Role = chatMsg.Role,
+                    Content = chatMsg.Content
+                });
+            }
+
+            UpdateTokenCount();
+
+            if (chatData.Messages.Count > 0)
+            {
+                Log($"[INFO] 已加载 {chatData.Messages.Count} 条聊天历史");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 加载聊天历史失败: {ex.Message}");
+        }
+    }
+
+    public void SaveChatHistory()
+    {
+        try
+        {
+            var chatMessages = new List<ChatMessage>();
+
+            foreach (var msg in _conversationHistory)
+            {
+                chatMessages.Add(new ChatMessage
+                {
+                    Role = msg.Role,
+                    Content = msg.Content,
+                    Timestamp = DateTime.Now,
+                    DeviceId = StorageService.Instance.DeviceId
+                });
+            }
+
+            var chatData = new ChatHistoryData
+            {
+                Messages = chatMessages,
+                LastUpdated = DateTime.Now
+            };
+
+            StorageService.Instance.SaveChatHistory(chatData);
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 保存聊天历史失败: {ex.Message}");
+        }
+    }
+
+    public List<ChatMessage> GetConversationHistory()
+    {
+        return _conversationHistory.Select(m => new ChatMessage
+        {
+            Role = m.Role,
+            Content = m.Content,
+            Timestamp = DateTime.Now,
+            DeviceId = StorageService.Instance.DeviceId
+        }).ToList();
+    }
+
     public double TokenUsagePercentage => MaxTokens > 0 ? (TotalTokens * 100.0 / MaxTokens) : 0;
     public int MaxTokenLimit => MaxTokens;
 
@@ -53,6 +124,9 @@ public class AgentService
     public event Action<int, int>? OnTokenUsageUpdated;
     public event Action<string>? OnContextSummarized;
     public event Func<string, Task<bool>>? OnConfirmHighRiskCommand;
+    public event Action<string>? OnShellOutput;
+    public event Action<string>? OnShellError;
+    public event Action? OnShellComplete;
 
     public AgentService(AgentSettings settings)
     {
@@ -1491,6 +1565,9 @@ public class AgentService
 
     private async Task<string> ExecuteShellCommandAsync(string command, string shellType)
     {
+        var outputBuilder = new System.Text.StringBuilder();
+        var errorBuilder = new System.Text.StringBuilder();
+
         try
         {
             if (IsHighRiskCommand(command))
@@ -1508,6 +1585,10 @@ public class AgentService
                     return "❌ 高风险命令需要用户确认，但确认回调未设置喵~";
                 }
             }
+
+            OnShellOutput?.Invoke($"▶ 正在执行: {command}");
+            OnShellOutput?.Invoke($"🔧 使用Shell: {(shellType.ToLower() == "cmd" ? "CMD" : "PowerShell")}");
+            OnShellOutput?.Invoke("---");
 
             var psi = new System.Diagnostics.ProcessStartInfo();
             
@@ -1532,25 +1613,69 @@ public class AgentService
             using var process = System.Diagnostics.Process.Start(psi);
             if (process == null)
             {
+                OnShellError?.Invoke("❌ 无法启动进程喵~");
                 return "❌ 无法启动进程喵~";
             }
 
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
+            var outputTask = Task.Run(async () =>
+            {
+                var buffer = new char[1024];
+                while (!process.HasExited)
+                {
+                    var bytesRead = await process.StandardOutput.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead > 0)
+                    {
+                        var text = new string(buffer, 0, bytesRead);
+                        outputBuilder.Append(text);
+                        OnShellOutput?.Invoke(text);
+                    }
+                    await Task.Delay(50);
+                }
+                var remaining = await process.StandardOutput.ReadToEndAsync();
+                if (!string.IsNullOrEmpty(remaining))
+                {
+                    outputBuilder.Append(remaining);
+                    OnShellOutput?.Invoke(remaining);
+                }
+            });
+
+            var errorTask = Task.Run(async () =>
+            {
+                var buffer = new char[1024];
+                while (!process.HasExited)
+                {
+                    var bytesRead = await process.StandardError.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead > 0)
+                    {
+                        var text = new string(buffer, 0, bytesRead);
+                        errorBuilder.Append(text);
+                        OnShellError?.Invoke(text);
+                    }
+                    await Task.Delay(50);
+                }
+                var remaining = await process.StandardError.ReadToEndAsync();
+                if (!string.IsNullOrEmpty(remaining))
+                {
+                    errorBuilder.Append(remaining);
+                    OnShellError?.Invoke(remaining);
+                }
+            });
 
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
-            var completedTask = await Task.WhenAny(Task.WhenAll(outputTask, errorTask), timeoutTask);
+            var completedTask = await Task.WhenAny(Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync()), timeoutTask);
 
             if (completedTask == timeoutTask)
             {
                 process.Kill(true);
+                OnShellError?.Invoke("❌ 命令执行超时（30秒）喵~");
+                OnShellComplete?.Invoke();
                 return "❌ 命令执行超时（30秒）喵~";
             }
 
             await process.WaitForExitAsync();
 
-            var output = await outputTask;
-            var error = await errorTask;
+            var output = outputBuilder.ToString();
+            var error = errorBuilder.ToString();
 
             var result = "";
             if (!string.IsNullOrWhiteSpace(output))
@@ -1570,17 +1695,25 @@ public class AgentService
             }
 
             result += $"\n\n📊 退出码: {process.ExitCode}";
+            
+            OnShellOutput?.Invoke($"---");
+            OnShellOutput?.Invoke($"📊 退出码: {process.ExitCode}");
+            OnShellComplete?.Invoke();
 
             return result;
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
             Log($"[ERROR] Shell执行失败: {ex.Message}");
+            OnShellError?.Invoke($"❌ Shell执行失败: {ex.Message}");
+            OnShellComplete?.Invoke();
             return $"❌ Shell执行失败: {ex.Message}";
         }
         catch (Exception ex)
         {
             Log($"[ERROR] 执行命令异常: {ex.Message}");
+            OnShellError?.Invoke($"❌ 执行命令异常: {ex.Message}");
+            OnShellComplete?.Invoke();
             return $"❌ 执行命令异常: {ex.Message}";
         }
     }
@@ -1630,7 +1763,7 @@ public class AgentService
         }
     }
 
-    private class Message
+    internal class Message
     {
         [JsonPropertyName("role")]
         public string Role { get; set; } = "";
@@ -1645,7 +1778,7 @@ public class AgentService
         public List<ToolCall>? ToolCalls { get; set; }
     }
 
-    private class ToolCall
+    internal class ToolCall
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = "";
@@ -1657,7 +1790,7 @@ public class AgentService
         public FunctionCall Function { get; set; } = new();
     }
 
-    private class FunctionCall
+    internal class FunctionCall
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = "";

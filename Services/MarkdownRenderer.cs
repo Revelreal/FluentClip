@@ -289,7 +289,8 @@ public static class MarkdownRenderer
                     tableRows.Clear();
                 }
 
-                if (!Regex.IsMatch(trimmedLine, @"^[\s|: -]+$"))
+                var isSeparatorLine = Regex.IsMatch(trimmedLine, @"^[\s|:\\-]+$") || Regex.IsMatch(trimmedLine, @"^\|?[\s\-:]+\|$");
+                if (!isSeparatorLine)
                 {
                     var cells = trimmedLine.Split('|', StringSplitOptions.RemoveEmptyEntries);
                     for (int j = 0; j < cells.Length; j++)
@@ -529,11 +530,25 @@ public static class MarkdownRenderer
                     var linkText = new Hyperlink(new Run(match.Content))
                     {
                         Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
-                        TextDecorations = TextDecorations.Underline
+                        TextDecorations = TextDecorations.Underline,
+                        Cursor = Cursors.Hand
                     };
                     try
                     {
                         linkText.NavigateUri = new Uri(match.Extra);
+                        linkText.RequestNavigate += (sender, e) =>
+                        {
+                            try
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = e.Uri.AbsoluteUri,
+                                    UseShellExecute = true
+                                });
+                            }
+                            catch { }
+                            e.Handled = true;
+                        };
                     }
                     catch { }
                     textBlock.Inlines.Add(linkText);
@@ -634,6 +649,12 @@ public static class MarkdownRenderer
         for (int i = 0; i < headers.Length; i++)
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+        }
+
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (int i = 0; i < rows.Length; i++)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
 
         var headerBorder = new Border

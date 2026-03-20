@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -24,6 +26,113 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings = settings;
         _clipboardService = new ClipboardService();
         _clipboardService.ClipboardChanged += OnClipboardChanged;
+        LoadStagingData();
+    }
+
+    public void LoadStagingData()
+    {
+        try
+        {
+            var stagingData = StorageService.Instance.LoadStagingData();
+            var validItems = StorageService.Instance.ValidateAndCleanStagingItems(stagingData.Items);
+            
+            foreach (var stagingItem in validItems)
+            {
+                var clipboardItem = new ClipboardItem
+                {
+                    ItemType = stagingItem.ItemType,
+                    TextContent = stagingItem.TextContent,
+                    Timestamp = stagingItem.Timestamp
+                };
+
+                if (stagingItem.FilePaths.Count > 0)
+                {
+                    clipboardItem.FilePaths = stagingItem.FilePaths.ToArray();
+                    
+                    var firstFile = stagingItem.FilePaths[0];
+                    var ext = System.IO.Path.GetExtension(firstFile)?.ToLowerInvariant();
+                    var audioExts = new[] { ".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a" };
+                    
+                    if (clipboardItem.ItemType == ClipboardItemType.Image)
+                    {
+                        clipboardItem.Thumbnail = ThumbnailHelper.GenerateThumbnail(firstFile);
+                    }
+                    else if (audioExts.Contains(ext))
+                    {
+                        var metadata = ThumbnailHelper.ExtractAudioMetadata(firstFile);
+                        if (metadata.HasValue)
+                        {
+                            clipboardItem.Artist = metadata.Value.Artist;
+                            clipboardItem.AlbumArt = metadata.Value.AlbumArt;
+                        }
+                        clipboardItem.Thumbnail = ThumbnailHelper.GenerateThumbnail(firstFile);
+                    }
+                    else
+                    {
+                        clipboardItem.Thumbnail = ThumbnailHelper.GenerateThumbnail(firstFile);
+                    }
+                }
+
+                if (!IsDuplicate(clipboardItem))
+                {
+                    ClipboardItems.Add(clipboardItem);
+                }
+            }
+
+            if (validItems.Count > 0)
+            {
+                Log($"[INFO] 已加载 {validItems.Count} 个暂存区项目");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 加载暂存区数据失败: {ex.Message}");
+        }
+    }
+
+    public void SaveStagingData()
+    {
+        try
+        {
+            var stagingItems = new List<StagingItem>();
+
+            foreach (var item in ClipboardItems)
+            {
+                var stagingItem = new StagingItem
+                {
+                    ItemType = item.ItemType,
+                    TextContent = item.TextContent,
+                    Timestamp = item.Timestamp,
+                    FilePaths = item.FilePaths?.ToList() ?? new List<string>()
+                };
+                stagingItems.Add(stagingItem);
+            }
+
+            var stagingData = new StagingData
+            {
+                Items = stagingItems,
+                LastUpdated = DateTime.Now
+            };
+
+            StorageService.Instance.SaveStagingData(stagingData);
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 保存暂存区数据失败: {ex.Message}");
+        }
+    }
+
+    private void Log(string message)
+    {
+        try
+        {
+            var logDir = Path.Combine(StorageService.GetAppDataPath(), "logs");
+            Directory.CreateDirectory(logDir);
+            var logFile = Path.Combine(logDir, $"app_{DateTime.Now:yyyyMMdd}.log");
+            var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+            File.AppendAllText(logFile, logEntry + Environment.NewLine);
+        }
+        catch { }
     }
 
     public void StartMonitoring(Window window)
@@ -112,11 +221,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
                             Timestamp = DateTime.Now
                         };
                         ClipboardItems.Insert(0, item);
+                        SaveStagingData();
                     }
                 }
             }
             catch
             {
+            }
+
+            if (ClipboardItems.Count > 0)
+            {
+                SaveStagingData();
             }
         });
     }
@@ -133,6 +248,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool IsDuplicate(string text)
     {
         return ClipboardItems.Any(x => x.ItemType == ClipboardItemType.Text && x.TextContent == text);
+    }
+
+    private bool IsDuplicate(ClipboardItem item)
+    {
+        if (item.ItemType == ClipboardItemType.Text)
+        {
+            return ClipboardItems.Any(x => x.ItemType == ClipboardItemType.Text && x.TextContent == item.TextContent);
+        }
+        else if (item.ItemType == ClipboardItemType.File && item.FilePaths != null)
+        {
+            return ClipboardItems.Any(x => x.ItemType == ClipboardItemType.File && 
+                x.FilePaths != null && 
+                x.FilePaths.SequenceEqual(item.FilePaths));
+        }
+        return false;
     }
 
     [RelayCommand]
@@ -213,6 +343,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (item != null)
         {
             ClipboardItems.Remove(item);
+            SaveStagingData();
         }
     }
 
@@ -220,6 +351,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ClearAll()
     {
         ClipboardItems.Clear();
+        SaveStagingData();
     }
 
     public void Dispose()

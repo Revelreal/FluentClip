@@ -178,7 +178,31 @@ public partial class MainWindow : Window
         
         return validExtensions.Contains(ext);
     }
-    
+
+    private static T? FindChild<T>(DependencyObject parent, string childName) where T : DependencyObject
+    {
+        if (parent == null) return null;
+
+        int childrenCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < childrenCount; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+
+            if (child is T typedChild && child is FrameworkElement fe && fe.Name == childName)
+            {
+                return typedChild;
+            }
+
+            var foundChild = FindChild<T>(child, childName);
+            if (foundChild != null)
+            {
+                return foundChild;
+            }
+        }
+
+        return null;
+    }
+
     private void Log(string message)
     {
         try
@@ -557,6 +581,10 @@ public partial class MainWindow : Window
             _agentService.GetAiWorkFolderFilesCallback = () => GetAiWorkFolderFiles();
             _agentService.OnContextSummarized += HandleContextSummarized;
             _agentService.OnConfirmHighRiskCommand += HandleConfirmHighRiskCommand;
+            _agentService.OnShellOutput += HandleShellOutput;
+            _agentService.OnShellError += HandleShellError;
+            _agentService.OnShellComplete += HandleShellComplete;
+            _agentService.LoadChatHistory();
         }
 
         UpdateTokenUsageDisplay();
@@ -660,6 +688,115 @@ public partial class MainWindow : Window
         return result == System.Windows.MessageBoxResult.Yes;
     }
 
+    private Border? _shellOutputBorder;
+    private TextBlock? _shellOutputTextBlock;
+    private bool _isFirstShellOutput = true;
+
+    private void HandleShellOutput(string output)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_shellOutputBorder == null || _shellOutputTextBlock == null)
+            {
+                var result = CreateShellOutputPanel();
+                _shellOutputBorder = result.border;
+                _shellOutputTextBlock = result.textBlock;
+            }
+
+            if (_isFirstShellOutput && AgentChatPanel.Children.Count > 0)
+            {
+                var lastChild = AgentChatPanel.Children[AgentChatPanel.Children.Count - 1];
+                if (lastChild is Border lastBorder)
+                {
+                    var lastContent = FindChild<TextBlock>(lastBorder, "AgentMessageText");
+                    if (lastContent != null && string.IsNullOrWhiteSpace(lastContent.Text))
+                    {
+                        AgentChatPanel.Children.Remove(lastBorder);
+                    }
+                }
+                _isFirstShellOutput = false;
+            }
+
+            _shellOutputTextBlock.Text += output;
+            AgentChatScrollViewer.ScrollToEnd();
+        });
+    }
+
+    private void HandleShellError(string error)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_shellOutputBorder != null && _shellOutputTextBlock != null)
+            {
+                _shellOutputTextBlock.Text += $"\n❌ {error}";
+                AgentChatScrollViewer.ScrollToEnd();
+            }
+        });
+    }
+
+    private void HandleShellComplete()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            _isFirstShellOutput = true;
+            _shellOutputBorder = null;
+            _shellOutputTextBlock = null;
+        });
+    }
+
+    private (Border border, TextBlock textBlock) CreateShellOutputPanel()
+    {
+        var border = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(25, 25, 28)),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 8, 12, 8),
+            Margin = new Thickness(0, 4, 0, 4),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            MaxWidth = AgentChatPanel.ActualWidth > 0 ? AgentChatPanel.ActualWidth - 40 : 400,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(60, 60, 65)),
+            BorderThickness = new Thickness(1)
+        };
+
+        var textBlock = new TextBlock
+        {
+            FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New"),
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(156, 220, 254)),
+            TextWrapping = TextWrapping.Wrap,
+            Text = ""
+        };
+
+        border.Child = textBlock;
+        AgentChatPanel.Children.Add(border);
+
+        return (border, textBlock);
+    }
+
+    private void RebuildChatDisplay()
+    {
+        if (_agentService == null || AgentChatPanel == null) return;
+        
+        AgentChatPanel.Children.Clear();
+        
+        var history = _agentService.GetConversationHistory();
+        if (history == null) return;
+        
+        foreach (var message in history)
+        {
+            if (message == null || string.IsNullOrEmpty(message.Content)) continue;
+            
+            if (message.Role == "user")
+            {
+                AddAgentMessage(message.Content, true);
+            }
+            else if (message.Role == "assistant")
+            {
+                AddAgentMessage(message.Content, false);
+            }
+        }
+    }
+
     private IEnumerable<string> GetAiWorkFolderFiles()
     {
         var settings = AgentSettings.Load();
@@ -731,6 +868,15 @@ public partial class MainWindow : Window
             _agentService.GetAiWorkFolderFilesCallback = () => GetAiWorkFolderFiles();
             _agentService.OnContextSummarized += HandleContextSummarized;
             _agentService.OnConfirmHighRiskCommand += HandleConfirmHighRiskCommand;
+            _agentService.OnShellOutput += HandleShellOutput;
+            _agentService.OnShellError += HandleShellError;
+            _agentService.OnShellComplete += HandleShellComplete;
+            _agentService.LoadChatHistory();
+        }
+
+        if (_agentService.MessageCount > 0)
+        {
+            RebuildChatDisplay();
         }
 
         if (_agentService.MessageCount == 0)
@@ -817,7 +963,7 @@ public partial class MainWindow : Window
             CornerRadius = new CornerRadius(18),
             Padding = new Thickness(14, 10, 14, 10),
             Effect = (System.Windows.Media.Effects.Effect)FindResource("CardShadow"),
-            MaxWidth = 280
+            MaxWidth = AgentChatPanel.ActualWidth > 0 ? AgentChatPanel.ActualWidth - 60 : 500
         };
 
         FrameworkElement content;
