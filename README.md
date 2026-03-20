@@ -1,105 +1,167 @@
-# FluentClip
+# <img src="https://img.shields.io/badge/FluentClip-📎-blue?style=flat&logo=clippy" height="28"> FluentClip
 
-一个优雅的 Windows 剪贴板管理器，内置 AI 助手功能。
+<p align="center">
+  <b>智能剪贴板管理器</b> · <b>AI 助手</b> · Windows 桌面应用
+</p>
 
-## 功能特点
+<p align="center">
+  <a href="https://github.com/fluentclip/fluentclip/stargazers">
+    <img src="https://img.shields.io/github/stars/fluentclip/fluentclip?style=flat&color=blue" alt="stars">
+  </a>
+  <a href="https://github.com/fluentclip/fluentclip/network/members">
+    <img src="https://img.shields.io/github/forks/fluentclip/fluentclip?style=flat&color=blue" alt="forks">
+  </a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010/11-blue?style=flat" alt="platform">
+  <img src="https://img.shields.io/badge/.NET-9.0-blue?style=flat&logo=.net" alt=".NET">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat" alt="license">
+</p>
 
-### 剪贴板管理
-- 📋 **剪贴板历史记录** - 自动记录剪贴板历史，支持文本、图片、文件
-- ⌨️ **全局快捷键** - 支持自定义快捷键快速调用
-- 📌 **窗口置顶** - 可以将窗口置顶显示
-- 🎨 **macOS 风格 UI** - 现代简洁的界面设计
+---
 
-### AI 助手
-- 🤖 **MiniMax API 集成** - 基于 MiniMax 大语言模型
-- 💬 **流式回复** - 支持实时流式输出，体验更流畅
-- 🧠 **思考标签渲染** - 支持 `<think>` / `</think>` 思考标签的折叠显示
-- 🔌 **工具调用（实验性）** - 支持 Function Calling，可读取文件、写入文件、列目录、联网搜索
-- 🎭 **可自定义人格** - 支持设置 System Prompt，定制 AI 助手性格
+## ⭐ 功能亮点
 
-### 系统集成
-- 🪟 **最小化到托盘** - 支持系统托盘运行
-- ⚡ **全局热键** - 快捷键快速调用
-- 💾 **设置持久化** - 自动保存用户配置
+### 📋 剪贴板管理
 
-## 快捷键
+| | |
+|:---|:---|
+| � **历史记录** | 自动保存文本、图片、文件，随时回溯 |
+| 🔍 **智能搜索** | 实时过滤，输入即所得 |
+| ⭐ **收藏整理** | 标记常用项，一键直达 |
+| 🗑️ **安全删除** | 拖拽到垃圾桶，隐私保护 |
 
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl+Shift+V` | 显示主窗口 |
-| `Ctrl+Shift+S` | 打开设置窗口 |
-| `Ctrl+Shift+P` | 窗口置顶/取消置顶 |
+### 🤖 AI 助手
 
-## 技术栈
+| | |
+|:---|:---|
+| 💬 **智能对话** | MiniMax API 驱动，会思考的助手 |
+| � **Markdown** | 代码高亮、表格渲染，阅读舒适 |
+| � **工具调用** | 文件读写、目录列表、联网搜索 |
+| 🎭 **人格定制** | System Prompt，塑造专属 AI 个性 |
 
-- **.NET 9.0** - 现代 .NET 运行时
-- **WPF** - Windows Presentation Foundation UI 框架
-- **MVVM 架构** - 使用 CommunityToolkit.Mvvm
-- **MiniMax API** - AI 能力支持
+### 🖥️ 系统集成
 
-## 项目结构
+| | |
+|:---|:---|
+| 📍 **系统托盘** | 最小化后台，不打扰工作 |
+| ⌨️ **全局热键** | 快捷键随时调出 |
+| 🎨 **Fluent Design** | Windows 11 设计语言 |
+| 💾 **自动保存** | 设置持久化，无后顾之忧 |
 
-```
-FluentClip/
-├── Models/                 # 数据模型
-│   ├── AgentSettings.cs    # AI 助手配置
-│   ├── AppSettings.cs      # 应用程序配置
-│   └── ClipboardItem.cs    # 剪贴板项
-├── Services/               # 业务逻辑
-│   ├── AgentService.cs     # AI 助手服务
-│   ├── ClipboardService.cs # 剪贴板监控服务
-│   ├── HotkeyManager.cs    # 全局热键管理
-│   └── MarkdownRenderer.cs  # Markdown 渲染
-├── ViewModels/             # MVVM 视图模型
-│   └── MainViewModel.cs    # 主视图模型
-├── MainWindow.xaml        # 主窗口
-├── SettingsWindow.xaml    # 设置窗口
-├── AgentSettingsWindow.xaml # AI 助手设置窗口
-└── App.xaml               # 应用程序入口
-```
+---
 
-## 构建与运行
-
-### 开发模式
+## 🚀 快速开始
 
 ```bash
-cd FluentClip
+# 克隆
+git clone https://github.com/fluentclip/fluentclip.git
+cd fluentclip
+
+# 构建
 dotnet build
+
+# 运行
 dotnet run
 ```
 
-### 发布版本
+> 💡 **提示**: 发布为单文件 `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`
 
-```bash
-# 发布为自包含可执行文件（无需安装 .NET）
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+---
+
+## ⌨️ 快捷键
+
+| 功能 | 快捷键 |
+|:---|:---|
+| 显示主窗口 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> |
+| 打开设置 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> |
+| 窗口置顶 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> |
+
+---
+
+## 🏗️ 架构一览
+
+```
+┌────────────────────────────────────────────────────┐
+│                     FluentClip                      │
+├────────────────────────────────────────────────────┤
+│  Core/           Events/        Factories/        │
+│  ├─ API          ├─EventAggre   ├─ClipboardItem   │
+│  └─PluginMgr     └─ClipboardE    └─ Factory        │
+├────────────────────────────────────────────────────┤
+│  Services/                          Models/        │
+│  ├─ClipboardService  ├─Hotkey    ├─ClipboardItem  │
+│  ├─AgentService      ├─Toast     ├─AppSettings     │
+│  └─ThumbnailHelper   └─DragDrop  └─AgentSettings   │
+└────────────────────────────────────────────────────┘
 ```
 
-## 配置说明
+---
+
+## 🛠️ 技术栈
+
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│    .NET 9    │  │     WPF      │  │  Community   │
+│   Runtime    │  │     UI       │  │   MVVM       │
+└──────────────┘  └──────────────┘  └──────────────┘
+       │                 │                 │
+       ▼                 ▼                 ▼
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │  MiniMax API │  │   Windows     │  │  GitHub      │
+  │   AI 能力    │  │   系统集成    │  │   协作       │
+  └──────────────┘  └──────────────┘  └──────────────┘
+```
+
+---
+
+## ⚙️ 配置
 
 ### AI 助手设置
 
-首次使用需要配置 MiniMax API：
+```
+设置 → AI 助手
+  ├── Base URL: https://api.minimaxi.com/v1
+  ├── API Key:  [从 platform.minimaxi.com 获取]
+  └── 模型:     abab6.5s-chat (默认)
+```
 
-1. 打开 AI 助手设置界面
-2. 填写 Base URL（默认：`https://api.minimaxi.com/v1`）
-3. 填写 API Key
-4. 选择模型（默认：`MiniMax-M2.5`）
-5. 可选：自定义 System Prompt 调整 AI 人格
-6. 可选：开启"工具调用能力"实验性功能
+### 数据位置
 
-### 设置存储位置
+```
+%APPDATA%\FluentClip\
+  ├── settings.json        # 应用设置
+  ├── agent_settings.json # AI 设置
+  └── logs\               # 运行日志
+```
 
-- 应用程序设置：`%APPDATA%\FluentClip\settings.json`
-- AI 助手设置：`%APPDATA%\FluentClip\agent_settings.json`
-- 运行日志：`logs/agent_YYYYMMDD_HHmmss.log`
+---
 
-## 注意事项
+## 🤝 参与贡献
 
-- 工具调用功能目前为实验性功能，默认关闭
-- AI 助手需要有效的 MiniMax API Key 才能使用
-- 部分功能需要管理员权限（如全局热键）
+欢迎提交 Pull Request！请阅读 [贡献指南](CONTRIBUTING.md) 了解详情。
 
-## 许可证
+<a href="https://github.com/fluentclip/fluentclip/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=fluentclip/fluentclip&max=12" width="100%">
+</a>
 
-MIT License
+---
+
+## � 文档
+
+| 文档 | 说明 |
+|:---|:---|
+| [README](README.md) | 项目概览 |
+| [贡献指南](CONTRIBUTING.md) | 开发指引 |
+| [插件开发](PLUGIN_DEVELOPMENT.md) | 扩展开发 |
+| [English](README_EN.md) | English Version |
+
+---
+
+## 📄 许可证
+
+MIT License · © 2024 FluentClip Team
+
+---
+
+<p align="center">
+  <sub>Made with ❤️</sub>
+</p>

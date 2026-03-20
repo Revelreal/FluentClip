@@ -1,105 +1,166 @@
-# FluentClip
+# <img src="https://img.shields.io/badge/FluentClip-📎-blue?style=flat&logo=clippy" height="28"> FluentClip
 
-An elegant Windows clipboard manager with built-in AI assistant functionality.
+<p align="center">
+  <b>Smart Clipboard Manager</b> · <b>AI Assistant</b> · Windows Desktop App
+</p>
 
-## Features
+<p align="center">
+  <a href="https://github.com/fluentclip/fluentclip/stargazers">
+    <img src="https://img.shields.io/github/stars/fluentclip/fluentclip?style=flat&color=blue" alt="stars">
+  </a>
+  <a href="https://github.com/fluentclip/fluentclip/network/members">
+    <img src="https://img.shields.io/github/forks/fluentclip/fluentclip?style=flat&color=blue" alt="forks">
+  </a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010/11-blue?style=flat" alt="platform">
+  <img src="https://img.shields.io/badge/.NET-9.0-blue?style=flat&logo=.net" alt=".NET">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat" alt="license">
+</p>
 
-### Clipboard Management
-- 📋 **Clipboard History** - Automatically records clipboard history, supporting text, images, and files
-- ⌨️ **Global Hotkeys** - Customizable keyboard shortcuts for quick access
-- 📌 **Always on Top** - Pin window to stay visible
-- 🎨 **macOS-style UI** - Modern and clean interface design
+---
 
-### AI Assistant
-- 🤖 **MiniMax API Integration** - Powered by MiniMax large language model
-- 💬 **Streaming Response** - Real-time streaming output for better experience
-- 🧠 **Thinking Tag Rendering** - Supports collapsible `<think>` / `</think>` thinking tags
-- 🔌 **Tool Calling (Experimental)** - Supports Function Calling for file reading, writing, directory listing, and web search
-- 🎭 **Customizable Persona** - System Prompt customization for AI personality
+## ⭐ Features
 
-### System Integration
-- 🪟 **System Tray** - Run in background with system tray support
-- ⚡ **Global Hotkeys** - Quick access via keyboard shortcuts
-- 💾 **Persistent Settings** - Auto-save user configurations
+### 📋 Clipboard Management
 
-## Keyboard Shortcuts
+| | |
+|:---|:---|
+| 🔄 **History** | Auto-save text, images, files with search |
+| 🔍 **Quick Search** | Real-time filtering, instant results |
+| ⭐ **Favorites** | Star items for quick access |
+| 🗑️ **Trash Zone** | Drag to delete, protect privacy |
 
-| Shortcut | Function |
-|----------|----------|
-| `Ctrl+Shift+V` | Show main window |
-| `Ctrl+Shift+S` | Open settings window |
-| `Ctrl+Shift+P` | Toggle always on top |
+### 🤖 AI Assistant
 
-## Tech Stack
+| | |
+|:---|:---|
+| 💬 **Smart Chat** | Powered by MiniMax API |
+| 📝 **Markdown** | Code highlighting, table rendering |
+| 🔧 **Tool Calling** | File I/O, directory listing, web search |
+| 🎭 **Custom Persona** | System Prompt for unique AI personality |
 
-- **.NET 9.0** - Modern .NET runtime
-- **WPF** - Windows Presentation Foundation UI framework
-- **MVVM Architecture** - Using CommunityToolkit.Mvvm
-- **MiniMax API** - AI capability support
+### 🖥️ System Integration
 
-## Project Structure
+| | |
+|:---|:---|
+| 📍 **System Tray** | Run in background |
+| ⌨️ **Global Hotkeys** | Quick access anytime |
+| 🎨 **Fluent Design** | Windows 11 design language |
+| 💾 **Auto Save** | Persistent settings |
 
-```
-FluentClip/
-├── Models/                 # Data models
-│   ├── AgentSettings.cs    # AI assistant settings
-│   ├── AppSettings.cs      # Application settings
-│   └── ClipboardItem.cs    # Clipboard item
-├── Services/               # Business logic
-│   ├── AgentService.cs     # AI assistant service
-│   ├── ClipboardService.cs # Clipboard monitoring
-│   ├── HotkeyManager.cs    # Global hotkey management
-│   └── MarkdownRenderer.cs # Markdown rendering
-├── ViewModels/             # MVVM ViewModels
-│   └── MainViewModel.cs    # Main view model
-├── MainWindow.xaml        # Main window
-├── SettingsWindow.xaml    # Settings window
-├── AgentSettingsWindow.xaml # AI settings window
-└── App.xaml               # Application entry
-```
+---
 
-## Build & Run
-
-### Development Mode
+## 🚀 Quick Start
 
 ```bash
-cd FluentClip
+# Clone
+git clone https://github.com/fluentclip/fluentclip.git
+cd fluentclip
+
+# Build
 dotnet build
+
+# Run
 dotnet run
 ```
 
-### Release Build
+> 💡 **Tip**: Publish as single file `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`
 
-```bash
-# Publish as self-contained executable (no .NET installation required)
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+---
+
+## ⌨️ Shortcuts
+
+| Action | Shortcut |
+|:---|:---|
+| Show Window | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> |
+| Open Settings | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> |
+| Toggle On Top | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌────────────────────────────────────────────────────┐
+│                     FluentClip                      │
+├────────────────────────────────────────────────────┤
+│  Core/           Events/        Factories/        │
+│  ├─ API          ├─EventAggre   ├─ClipboardItem   │
+│  └─PluginMgr     └─ClipboardE    └─ Factory        │
+├────────────────────────────────────────────────────┤
+│  Services/                          Models/        │
+│  ├─ClipboardService  ├─Hotkey    ├─ClipboardItem  │
+│  ├─AgentService      ├─Toast     ├─AppSettings     │
+│  └─ThumbnailHelper   └─DragDrop  └─AgentSettings   │
+└────────────────────────────────────────────────────┘
 ```
 
-## Configuration
+---
 
-### AI Assistant Settings
+## 🛠️ Tech Stack
 
-Configure MiniMax API before first use:
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│    .NET 9    │  │     WPF      │  │  Community   │
+│   Runtime    │  │     UI       │  │   MVVM       │
+└──────────────┘  └──────────────┘  └──────────────┘
+       │                 │                 │
+       ▼                 ▼                 ▼
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │  MiniMax API │  │   Windows    │  │   GitHub    │
+  │   AI Power   │  │Integration   │  │  Collaboration
+  └──────────────┘  └──────────────┘  └──────────────┘
+```
 
-1. Open AI Assistant settings
-2. Fill in Base URL (default: `https://api.minimaxi.com/v1`)
-3. Fill in API Key
-4. Select model (default: `MiniMax-M2.5`)
-5. Optional: Customize System Prompt for AI personality
-6. Optional: Enable "Tool Calling" experimental feature
+---
 
-### Settings Storage Location
+## ⚙️ Configuration
 
-- App settings: `%APPDATA%\FluentClip\settings.json`
-- AI settings: `%APPDATA%\FluentClip\agent_settings.json`
-- Logs: `logs/agent_YYYYMMDD_HHmmss.log`
+### AI Assistant Setup
 
-## Notes
+```
+Settings → AI Assistant
+  ├── Base URL: https://api.minimaxi.com/v1
+  ├── API Key:  [Get from platform.minimaxi.com]
+  └── Model:    abab6.5s-chat (default)
+```
 
-- Tool calling is experimental and disabled by default
-- AI assistant requires a valid MiniMax API Key
-- Some features may require administrator privileges (e.g., global hotkeys)
+### Data Location
 
-## License
+```
+%APPDATA%\FluentClip\
+  ├── settings.json        # App Settings
+  ├── agent_settings.json # AI Settings
+  └── logs\               # Runtime Logs
+```
 
-MIT License
+---
+
+## 🤝 Contributing
+
+Welcome PRs! Read the [Contributing Guide](CONTRIBUTING.md) for details.
+
+<a href="https://github.com/fluentclip/fluentclip/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=fluentclip/fluentclip&max=12" width="100%">
+</a>
+
+---
+
+## 📖 Documentation
+
+| Document | Description |
+|:---|:---|
+| [中文版](README.md) | 项目概览 |
+| [Contributing](CONTRIBUTING.md) | Dev Guide |
+| [Plugin Dev](PLUGIN_DEVELOPMENT.md) | Extension Dev |
+
+---
+
+## 📄 License
+
+MIT License · © 2024 FluentClip Team
+
+---
+
+<p align="center">
+  <sub>Made with ❤️</sub>
+</p>

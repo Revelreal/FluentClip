@@ -776,6 +776,7 @@ public partial class MainWindow : Window
             var textExts = new[] { ".txt", ".md", ".json", ".xml", ".cs", ".js", ".html", ".css" };
 
             ClipboardItem item;
+            BitmapSource? thumbnail = null;
 
             if (imageExts.Contains(ext))
             {
@@ -789,6 +790,7 @@ public partial class MainWindow : Window
                 {
                     ItemType = ClipboardItemType.Image,
                     ImageContent = bitmap,
+                    Thumbnail = bitmap,
                     FilePaths = new[] { filePath },
                     Timestamp = DateTime.Now
                 };
@@ -806,10 +808,13 @@ public partial class MainWindow : Window
             }
             else
             {
+                thumbnail = ThumbnailHelper.GenerateThumbnail(filePath, 96, 96);
+                
                 item = new ClipboardItem
                 {
                     ItemType = ClipboardItemType.File,
                     FilePaths = new[] { filePath },
+                    Thumbnail = thumbnail,
                     Timestamp = DateTime.Now
                 };
             }

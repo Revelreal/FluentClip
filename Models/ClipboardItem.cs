@@ -90,4 +90,46 @@ public class ClipboardItem
         ClipboardItemType.File => FilePaths?.FirstOrDefault() ?? "",
         _ => ""
     };
+
+    public string FileTypeFormat
+    {
+        get
+        {
+            if (ItemType != ClipboardItemType.File || FilePaths?.Length == 0)
+                return "";
+
+            var ext = Path.GetExtension(FilePaths[0]).ToLowerInvariant();
+            var format = ext switch
+            {
+                ".jpg" or ".jpeg" => "图片 | JPG",
+                ".png" => "图片 | PNG",
+                ".gif" => "图片 | GIF",
+                ".bmp" => "图片 | BMP",
+                ".webp" => "图片 | WEBP",
+                ".svg" => "图片 | SVG",
+                ".mp3" => "音乐 | MP3",
+                ".wav" => "音乐 | WAV",
+                ".flac" => "音乐 | FLAC",
+                ".aac" => "音乐 | AAC",
+                ".ogg" => "音乐 | OGG",
+                ".mp4" => "视频 | MP4",
+                ".avi" => "视频 | AVI",
+                ".mkv" => "视频 | MKV",
+                ".mov" => "视频 | MOV",
+                ".pdf" => "文档 | PDF",
+                ".doc" or ".docx" => "文档 | Word",
+                ".xls" or ".xlsx" => "文档 | Excel",
+                ".ppt" or ".pptx" => "文档 | PPT",
+                ".txt" => "文档 | TXT",
+                ".zip" => "压缩包 | ZIP",
+                ".rar" => "压缩包 | RAR",
+                ".7z" => "压缩包 | 7Z",
+                ".exe" => "程序 | EXE",
+                ".dll" => "程序 | DLL",
+                _ => ext.Length > 0 ? $"{ext[1..].ToUpper()} 文件" : "文件"
+            };
+
+            return format;
+        }
+    }
 }

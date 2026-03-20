@@ -203,29 +203,22 @@
                                             </Border.Style>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0">
-                                                    <TextBlock FontSize="18" Margin="0,0,0,4">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Text" Value="📝"/>
-                                                                <Setter Property="FontFamily" Value="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding ItemType}" Value="Image">
-                                                                        <Setter Property="Text" Value="🖼️"/>
-                                                                    </DataTrigger>
-                                                                    <DataTrigger Binding="{Binding ItemType}" Value="File">
-                                                                        <Setter Property="Text" Value="📁"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                    <TextBlock Text="{Binding DisplayText}" FontSize="12" Foreground="#3D3D3D"
-                                                              TextTrimming="CharacterEllipsis" MaxHeight="34" LineHeight="17">
+                                                <Grid Grid.Column="0" Width="40" Height="40" Margin="0,0,12,0">
+                                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill">
+                                                        <Image.Clip>
+                                                            <EllipseGeometry Center="20,20" RadiusX="20" RadiusY="20"/>
+                                                        </Image.Clip>
+                                                    </Image>
+                                                </Grid>
+                                                
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplayText}" FontSize="13" Foreground="#3D3D3D"
+                                                              TextTrimming="CharacterEllipsis" MaxHeight="20">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="ToolTip" Value="{Binding DisplayText}"/>
@@ -237,11 +230,21 @@
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
-                                                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"
-                                                              FontSize="10" Foreground="#AEAEB2" Margin="0,6,0,0"/>
+                                                    <TextBlock FontSize="10" Foreground="#AEAEB2" Margin="0,4,0,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="{Binding Timestamp, StringFormat='{}{0:HH:mm}'}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding ItemType}" Value="File">
+                                                                        <Setter Property="Text" Value="{Binding FileTypeFormat}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </StackPanel>
 
-                                                <Button Grid.Column="1" Content="✕" FontSize="9"
+                                                <Button Grid.Column="2" Content="✕" FontSize="9"
                                                         VerticalAlignment="Top" HorizontalAlignment="Right"
                                                         Cursor="Hand" Padding="6"
                                                         Foreground="#C7C7CC"
