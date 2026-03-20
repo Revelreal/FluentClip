@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -221,6 +222,8 @@ public static class MarkdownRenderer
         public string Type { get; set; } = "";
         public string Content { get; set; } = "";
         public string Language { get; set; } = "";
+        public string[] Headers { get; set; } = Array.Empty<string>();
+        public string[][] Rows { get; set; } = Array.Empty<string[]>();
     }
 
     private static List<Block> ParseBlocks(string markdown)
@@ -231,9 +234,14 @@ public static class MarkdownRenderer
         var codeContent = "";
         var codeLanguage = "";
         var currentText = "";
+        var inTable = false;
+        var tableRows = new List<string[]>();
 
-        foreach (var line in lines)
+        for (int i = 0; i < lines.Length; i++)
         {
+            var line = lines[i];
+            var trimmedLine = line.Trim();
+
             if (line.Trim().StartsWith("```"))
             {
                 if (!inCodeBlock)
@@ -259,9 +267,76 @@ public static class MarkdownRenderer
             {
                 codeContent += line + "\n";
             }
+            else if (Regex.IsMatch(trimmedLine, @"^[-*_]{3,}$"))
+            {
+                if (!string.IsNullOrEmpty(currentText.Trim()))
+                {
+                    blocks.Add(new Block { Type = "text", Content = currentText.Trim() });
+                    currentText = "";
+                }
+                blocks.Add(new Block { Type = "hr" });
+            }
+            else if (trimmedLine.Contains("|") && trimmedLine.Trim().StartsWith("|"))
+            {
+                if (!inTable)
+                {
+                    if (!string.IsNullOrEmpty(currentText.Trim()))
+                    {
+                        blocks.Add(new Block { Type = "text", Content = currentText.Trim() });
+                        currentText = "";
+                    }
+                    inTable = true;
+                    tableRows.Clear();
+                }
+
+                if (!Regex.IsMatch(trimmedLine, @"^[\s|: -]+$"))
+                {
+                    var cells = trimmedLine.Split('|', StringSplitOptions.RemoveEmptyEntries);
+                    for (int j = 0; j < cells.Length; j++)
+                    {
+                        cells[j] = cells[j].Trim();
+                    }
+                    tableRows.Add(cells);
+                }
+                else if (tableRows.Count > 0)
+                {
+                    blocks.Add(new Block { Type = "table", Content = "" });
+                    var tableBlock = blocks[blocks.Count - 1];
+                    tableBlock.Headers = tableRows[0];
+                    if (tableRows.Count > 1)
+                    {
+                        tableBlock.Rows = tableRows.Skip(1).ToArray();
+                    }
+                    tableRows.Clear();
+                    inTable = false;
+                }
+            }
             else
             {
+                if (inTable && tableRows.Count > 0)
+                {
+                    blocks.Add(new Block { Type = "table", Content = "" });
+                    var tableBlock = blocks[blocks.Count - 1];
+                    tableBlock.Headers = tableRows[0];
+                    if (tableRows.Count > 1)
+                    {
+                        tableBlock.Rows = tableRows.Skip(1).ToArray();
+                    }
+                    tableRows.Clear();
+                    inTable = false;
+                }
                 currentText += line + "\n";
+            }
+        }
+
+        if (inTable && tableRows.Count > 0)
+        {
+            blocks.Add(new Block { Type = "table", Content = "" });
+            var tableBlock = blocks[blocks.Count - 1];
+            tableBlock.Headers = tableRows[0];
+            if (tableRows.Count > 1)
+            {
+                tableBlock.Rows = tableRows.Skip(1).ToArray();
             }
         }
 
@@ -278,6 +353,16 @@ public static class MarkdownRenderer
         if (block.Type == "code")
         {
             return RenderCodeBlock(block.Content, block.Language);
+        }
+
+        if (block.Type == "hr")
+        {
+            return RenderHorizontalRule();
+        }
+
+        if (block.Type == "table")
+        {
+            return RenderTable(block.Headers, block.Rows);
         }
 
         return RenderTextBlock(block.Content);
@@ -307,6 +392,21 @@ public static class MarkdownRenderer
             if (trimmedLine.StartsWith("### "))
             {
                 panel.Children.Add(CreateTextBlock(trimmedLine.Substring(4), 14, FontWeights.SemiBold, "#1C1C1E"));
+                continue;
+            }
+            if (trimmedLine.StartsWith("> "))
+            {
+                var quoteText = trimmedLine.Substring(2);
+                var quoteBorder = new Border
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                    BorderThickness = new Thickness(3, 0, 0, 0),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(0, 4, 0, 4),
+                    Background = new SolidColorBrush(Color.FromRgb(250, 250, 250))
+                };
+                quoteBorder.Child = CreateInlineTextBlock(quoteText, 12, "#666666");
+                panel.Children.Add(quoteBorder);
                 continue;
             }
             if (trimmedLine.StartsWith("- ") || trimmedLine.StartsWith("* "))
@@ -360,60 +460,121 @@ public static class MarkdownRenderer
             Margin = new Thickness(0, 2, 0, 2)
         };
 
-        text = text.Replace("\\*\\*", "||BOLD||");
-        text = text.Replace("\\*", "||ITALIC||");
-        text = text.Replace("`", "||CODE||");
+        var processedText = ProcessInlineFormatting(text, fontSize, textBlock);
 
-        var segments = Regex.Split(text, @"(\*\*|[\*`]|\[\d+\])");
-
-        foreach (var segment in segments)
+        if (string.IsNullOrEmpty(processedText) && textBlock.Inlines.Count == 0)
         {
-            if (string.IsNullOrEmpty(segment)) continue;
-
-            if (segment == "**")
-            {
-                continue;
-            }
-            else if (segment.StartsWith("**") && segment.EndsWith("**"))
-            {
-                var boldText = segment.TrimStart('*').TrimEnd('*');
-                textBlock.Inlines.Add(new Run(boldText) { FontWeight = FontWeights.Bold });
-            }
-            else if (segment == "`")
-            {
-                continue;
-            }
-            else if (segment.StartsWith("`") && segment.EndsWith("`"))
-            {
-                var codeText = segment.Trim('`');
-                var border = new Border
-                {
-                    Background = new SolidColorBrush(Color.FromRgb(244, 244, 244)),
-                    CornerRadius = new CornerRadius(3),
-                    Padding = new Thickness(4, 1, 4, 1),
-                    Margin = new Thickness(2, 0, 2, 0)
-                };
-                border.Child = new TextBlock
-                {
-                    Text = codeText,
-                    FontFamily = new FontFamily("Consolas"),
-                    FontSize = fontSize - 1,
-                    Foreground = new SolidColorBrush(Color.FromRgb(227, 76, 38))
-                };
-                textBlock.Inlines.Add(new InlineUIContainer(border));
-            }
-            else
-            {
-                var processedSegment = segment
-                    .Replace("||BOLD||", "**")
-                    .Replace("||ITALIC||", "*")
-                    .Replace("||CODE||", "`");
-
-                textBlock.Inlines.Add(new Run(processedSegment));
-            }
+            textBlock.Inlines.Add(new Run(text));
         }
 
         return textBlock;
+    }
+
+    private static string ProcessInlineFormatting(string text, double fontSize, TextBlock textBlock)
+    {
+        var linkPattern = @"\[([^\]]+)\]\(([^\)]+)\)";
+        var boldPattern = @"\*\*(.+?)\*\*";
+        var italicPattern = @"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)";
+        var strikethroughPattern = @"~~(.+?)~~";
+        var codePattern = @"`([^`]+)`";
+
+        var matches = new List<(int Start, int End, string Type, string Content, string Extra)>();
+
+        foreach (Match match in Regex.Matches(text, linkPattern))
+        {
+            matches.Add((match.Index, match.Index + match.Length, "link", match.Groups[1].Value, match.Groups[2].Value));
+        }
+        foreach (Match match in Regex.Matches(text, boldPattern))
+        {
+            if (!matches.Any(m => m.Start <= match.Index && m.End >= match.Index + match.Length))
+            {
+                matches.Add((match.Index, match.Index + match.Length, "bold", match.Groups[1].Value, ""));
+            }
+        }
+        foreach (Match match in Regex.Matches(text, italicPattern))
+        {
+            if (!matches.Any(m => m.Start <= match.Index && m.End >= match.Index + match.Length))
+            {
+                matches.Add((match.Index, match.Index + match.Length, "italic", match.Groups[1].Value, ""));
+            }
+        }
+        foreach (Match match in Regex.Matches(text, strikethroughPattern))
+        {
+            if (!matches.Any(m => m.Start <= match.Index && m.End >= match.Index + match.Length))
+            {
+                matches.Add((match.Index, match.Index + match.Length, "strike", match.Groups[1].Value, ""));
+            }
+        }
+        foreach (Match match in Regex.Matches(text, codePattern))
+        {
+            if (!matches.Any(m => m.Start <= match.Index && m.End >= match.Index + match.Length))
+            {
+                matches.Add((match.Index, match.Index + match.Length, "code", match.Groups[1].Value, ""));
+            }
+        }
+
+        matches.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+        int lastEnd = 0;
+        foreach (var match in matches)
+        {
+            if (match.Start > lastEnd)
+            {
+                textBlock.Inlines.Add(new Run(text.Substring(lastEnd, match.Start - lastEnd)));
+            }
+
+            switch (match.Type)
+            {
+                case "link":
+                    var linkText = new Hyperlink(new Run(match.Content))
+                    {
+                        Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 204)),
+                        TextDecorations = TextDecorations.Underline
+                    };
+                    try
+                    {
+                        linkText.NavigateUri = new Uri(match.Extra);
+                    }
+                    catch { }
+                    textBlock.Inlines.Add(linkText);
+                    break;
+                case "bold":
+                    textBlock.Inlines.Add(new Run(match.Content) { FontWeight = FontWeights.Bold });
+                    break;
+                case "italic":
+                    textBlock.Inlines.Add(new Run(match.Content) { FontStyle = FontStyles.Italic });
+                    break;
+                case "strike":
+                    textBlock.Inlines.Add(new Run(match.Content) { TextDecorations = TextDecorations.Strikethrough });
+                    break;
+                case "code":
+                    var border = new Border
+                    {
+                        Background = new SolidColorBrush(Color.FromRgb(244, 244, 244)),
+                        CornerRadius = new CornerRadius(3),
+                        Padding = new Thickness(4, 1, 4, 1),
+                        Margin = new Thickness(2, 0, 2, 0)
+                    };
+                    border.Child = new TextBlock
+                    {
+                        Text = match.Content,
+                        FontFamily = new FontFamily("Consolas"),
+                        FontSize = fontSize - 1,
+                        Foreground = new SolidColorBrush(Color.FromRgb(227, 76, 38))
+                    };
+                    textBlock.Inlines.Add(new InlineUIContainer(border));
+                    break;
+            }
+
+            lastEnd = match.End;
+        }
+
+        if (lastEnd < text.Length)
+        {
+            textBlock.Inlines.Add(new Run(text.Substring(lastEnd)));
+        }
+
+        return text;
     }
 
     private static Border RenderCodeBlock(string code, string language)
@@ -453,5 +614,88 @@ public static class MarkdownRenderer
 
         border.Child = panel;
         return border;
+    }
+
+    private static FrameworkElement RenderHorizontalRule()
+    {
+        var border = new Border
+        {
+            Height = 1,
+            Background = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+            Margin = new Thickness(0, 12, 0, 12)
+        };
+        return border;
+    }
+
+    private static FrameworkElement RenderTable(string[] headers, string[][] rows)
+    {
+        var grid = new Grid();
+
+        for (int i = 0; i < headers.Length; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+        }
+
+        var headerBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+            Padding = new Thickness(8, 6, 8, 6),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220)),
+            BorderThickness = new Thickness(0, 0, 1, 1)
+        };
+        var headerPanel = new StackPanel { Orientation = Orientation.Horizontal };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var headerText = new TextBlock
+            {
+                Text = headers[i],
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)),
+                Margin = new Thickness(4, 0, 4, 0)
+            };
+            headerPanel.Children.Add(headerText);
+        }
+        headerBorder.Child = headerPanel;
+        Grid.SetRow(headerBorder, 0);
+        grid.Children.Add(headerBorder);
+
+        for (int rowIdx = 0; rowIdx < rows.Length; rowIdx++)
+        {
+            var row = rows[rowIdx];
+            var rowBorder = new Border
+            {
+                Padding = new Thickness(8, 6, 8, 6),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220)),
+                BorderThickness = new Thickness(0, 0, 1, 1)
+            };
+            var rowPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            for (int colIdx = 0; colIdx < row.Length; colIdx++)
+            {
+                var cellText = new TextBlock
+                {
+                    Text = row[colIdx],
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)),
+                    Margin = new Thickness(4, 0, 4, 0),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                rowPanel.Children.Add(cellText);
+            }
+            rowBorder.Child = rowPanel;
+            Grid.SetRow(rowBorder, rowIdx + 1);
+            grid.Children.Add(rowBorder);
+        }
+
+        var container = new Border
+        {
+            Margin = new Thickness(0, 8, 0, 8),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Child = grid
+        };
+
+        return container;
     }
 }

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using FluentClip.Models;
@@ -26,8 +27,11 @@ public partial class AgentSettingsWindow : Window
         ModelTextBox.Text = _settings.Model;
         StreamingCheckBox.IsChecked = _settings.UseStreaming;
         EnableToolCallsCheckBox.IsChecked = _settings.EnableToolCalls;
+        PersonaPromptTextBox.Text = _settings.PersonaPrompt;
         SystemPromptTextBox.Text = _settings.SystemPrompt;
         AvatarPathText.Text = string.IsNullOrEmpty(_settings.AvatarPath) ? "未选择（将使用默认头像）" : _settings.AvatarPath;
+        AiWorkFolderTextBox.Text = _settings.AiWorkFolder;
+        EnableShellExecutionCheckBox.IsChecked = _settings.EnableShellExecution;
     }
 
     private void AgentSettingsWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -53,7 +57,9 @@ public partial class AgentSettingsWindow : Window
         _settings.Model = ModelTextBox.Text;
         _settings.UseStreaming = StreamingCheckBox.IsChecked ?? true;
         _settings.EnableToolCalls = EnableToolCallsCheckBox.IsChecked ?? false;
-        _settings.SystemPrompt = SystemPromptTextBox.Text;
+        _settings.PersonaPrompt = PersonaPromptTextBox.Text;
+        _settings.AiWorkFolder = AiWorkFolderTextBox.Text;
+        _settings.EnableShellExecution = EnableShellExecutionCheckBox.IsChecked ?? false;
         _settings.Save();
     }
 
@@ -75,6 +81,26 @@ public partial class AgentSettingsWindow : Window
         {
             _settings.AvatarPath = dialog.FileName;
             AvatarPathText.Text = dialog.FileName;
+        }
+    }
+
+    private void BrowseAiWorkFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "选择AI工作文件夹",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true
+        };
+
+        if (!string.IsNullOrEmpty(AiWorkFolderTextBox.Text) && Directory.Exists(AiWorkFolderTextBox.Text))
+        {
+            dialog.SelectedPath = AiWorkFolderTextBox.Text;
+        }
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            AiWorkFolderTextBox.Text = dialog.SelectedPath;
         }
     }
 

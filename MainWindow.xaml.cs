@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -40,13 +42,17 @@ public partial class MainWindow : Window
     private ToolStripMenuItem? _dragActionMenuItem;
     private bool _isAgentSidebarVisible;
     private AgentService? _agentService;
+    private FileSystemWatcher? _aiWorkFolderWatcher;
+    private readonly HashSet<string> _knownAiWorkFiles = new();
 
     // Typing effect variables
     private System.Windows.Threading.DispatcherTimer? _typingTimer;
     private string _pendingResponse = "";
     private string _displayedResponse = "";
+    private string _streamingBuffer = "";
     private Border? _currentTypingBorder;
     private bool _isTyping;
+    private bool _isToolCallInProgress = false;
 
     public MainWindow()
     {
@@ -83,6 +89,107 @@ public partial class MainWindow : Window
         }, System.Windows.Threading.DispatcherPriority.Loaded);
 
         PinButton.Content = _isPinned ? "📍" : "📌";
+        
+        InitializeAiWorkFolderWatcher();
+    }
+    
+    private void InitializeAiWorkFolderWatcher()
+    {
+        var settings = AgentSettings.Load();
+        if (string.IsNullOrEmpty(settings.AiWorkFolder))
+        {
+            return;
+        }
+        
+        if (!Directory.Exists(settings.AiWorkFolder))
+        {
+            return;
+        }
+        
+        try
+        {
+            _aiWorkFolderWatcher = new FileSystemWatcher(settings.AiWorkFolder)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.CreationTime | NotifyFilters.LastWrite,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false
+            };
+            
+            _aiWorkFolderWatcher.Created += OnAiWorkFolderFileCreated;
+            _aiWorkFolderWatcher.Changed += OnAiWorkFolderFileChanged;
+            
+            foreach (var file in Directory.GetFiles(settings.AiWorkFolder))
+            {
+                _knownAiWorkFiles.Add(file);
+            }
+            
+            Log($"[DEBUG] AI工作文件夹监控已启动: {settings.AiWorkFolder}");
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 初始化AI工作文件夹监控失败: {ex.Message}");
+        }
+    }
+    
+    private void OnAiWorkFolderFileCreated(object sender, FileSystemEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.FullPath)) return;
+        
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                if (!_knownAiWorkFiles.Contains(e.FullPath))
+                {
+                    _knownAiWorkFiles.Add(e.FullPath);
+                    
+                    var ext = Path.GetExtension(e.FullPath)?.ToLowerInvariant();
+                    if (IsValidFileType(ext))
+                    {
+                        AddFileToList(e.FullPath);
+                        ShowToast($"📁 AI生成了新文件: {Path.GetFileName(e.FullPath)}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[ERROR] 处理AI工作文件夹新文件失败: {ex.Message}");
+            }
+        });
+    }
+    
+    private void OnAiWorkFolderFileChanged(object sender, FileSystemEventArgs e)
+    {
+    }
+    
+    private bool IsValidFileType(string? ext)
+    {
+        if (string.IsNullOrEmpty(ext)) return false;
+        
+        var validExtensions = new[] 
+        { 
+            ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".tsx", ".jsx",
+            ".html", ".css", ".py", ".java", ".c", ".cpp", ".h", ".hpp", ".go",
+            ".rs", ".rb", ".php", ".sql", ".yaml", ".yml", ".ini", ".cfg",
+            ".log", ".bat", ".ps1", ".sh", ".pdf", ".doc", ".docx",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico",
+            ".zip", ".rar", ".7z", ".tar", ".gz"
+        };
+        
+        return validExtensions.Contains(ext);
+    }
+    
+    private void Log(string message)
+    {
+        try
+        {
+            var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+            Directory.CreateDirectory(logDir);
+            var logFile = Path.Combine(logDir, $"app_{DateTime.Now:yyyyMMdd}.log");
+            var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+            File.AppendAllText(logFile, logEntry + Environment.NewLine);
+        }
+        catch { }
     }
 
     private void RegisterHotkeys()
@@ -336,7 +443,7 @@ public partial class MainWindow : Window
         if (_isAgentSidebarVisible)
         {
             AgentSidebar.Visibility = Visibility.Visible;
-            AgentColumn.Width = new GridLength(230);
+            AgentColumn.Width = new GridLength(300);
             AgentColumn.MinWidth = 230;
             MinWidth = 650;
             MinHeight = 560;
@@ -431,6 +538,8 @@ public partial class MainWindow : Window
         var userMessage = AgentInputTextBox.Text.Trim();
         if (string.IsNullOrEmpty(userMessage)) return;
 
+        StopTypingEffect();
+
         AddAgentMessage(userMessage, true);
         AgentInputTextBox.Text = "";
 
@@ -441,84 +550,199 @@ public partial class MainWindow : Window
             return;
         }
 
-        var clipboardFilesInfo = "";
-        var fileItems = _viewModel.ClipboardItems.Where(i => i.ItemType == ClipboardItemType.File).ToList();
-        if (fileItems.Any())
+        if (_agentService == null)
         {
-            clipboardFilesInfo = "\n\n【用户剪贴板中的文件】\n";
-            foreach (var item in fileItems)
-            {
-                clipboardFilesInfo += $"- {item.FullPath}\n";
-            }
-            clipboardFilesInfo += "你可以使用read_file工具读取这些文件内容喵~\n";
+            _agentService = new AgentService(settings);
+            _agentService.GetStagingFilesCallback = () => _viewModel.ClipboardItems;
+            _agentService.GetAiWorkFolderFilesCallback = () => GetAiWorkFolderFiles();
+            _agentService.OnContextSummarized += HandleContextSummarized;
+            _agentService.OnConfirmHighRiskCommand += HandleConfirmHighRiskCommand;
         }
 
-        var fullMessage = userMessage + clipboardFilesInfo;
+        UpdateTokenUsageDisplay();
 
-        _agentService = new AgentService(settings);
-        
-        var lastAssistantMessage = AddAgentMessage("", false);
-        var toolCallStatus = AddToolCallStatus("🔧 等待响应中...");
-        
-        string accumulatedResponse = "";
+        if (_agentService.ShouldSummarize)
+        {
+            AddAgentMessage("上下文即将达到上限，正在自动总结...", false);
+            var summary = await _agentService.SummarizeContextAsync();
+            AddAgentMessage($"✅ 上下文已总结，新token使用: {_agentService.TotalTokens} / {_agentService.MaxTokenLimit} ({_agentService.TokenUsagePercentage:F1}%)", false);
+        }
+        else if (_agentService.CheckAndClearContextIfFull())
+        {
+            AddAgentMessage("上下文已自动清除，开始新对话~ 🐾", false);
+        }
 
-        // Initialize typing effect
+        var messageBorder = AddAgentMessage("", false);
+        var statusBorder = AddToolCallStatus("🔧 等待响应中...");
+
+        string currentResponse = "";
+
         _pendingResponse = "";
         _displayedResponse = "";
         _isTyping = false;
 
-        _agentService.OnToolCallStart += (toolName) =>
+        void HandleStreaming(string chunk)
         {
             Dispatcher.Invoke(() =>
             {
-                UpdateToolCallStatus(toolCallStatus, $"🔧 正在调用工具: {toolName}...");
-            });
-        };
+                currentResponse += chunk;
+                _pendingResponse = currentResponse;
 
-        _agentService.OnStreamingResponse += (chunk) =>
-        {
-            Dispatcher.Invoke(() =>
-            {
-                accumulatedResponse += chunk;
+                var targetBorder = messageBorder.Item1;
+                _currentTypingBorder = targetBorder;
 
-                // If not currently typing, start the typing effect
                 if (!_isTyping)
                 {
-                    _pendingResponse = accumulatedResponse;
-                    _currentTypingBorder = lastAssistantMessage.Item1;
+                    _displayedResponse = "";
                     StartTypingEffect();
                 }
-                else
-                {
-                    // Add to pending response
-                    _pendingResponse = accumulatedResponse;
-                }
-            });
-        };
 
-        _agentService.OnError += (error) =>
+                AgentChatScrollViewer.ScrollToEnd();
+            });
+        }
+
+        void HandleToolCallStart(string toolName)
         {
             Dispatcher.Invoke(() =>
             {
-                // Stop typing effect if active
-                StopTypingEffect();
-                RemoveToolCallStatus(toolCallStatus);
-                UpdateLastAgentMessage(lastAssistantMessage.Item1, $"错误: {error}");
+                UpdateToolCallStatus(statusBorder, $"🔧 正在调用工具: {toolName}...");
             });
-        };
+        }
+
+        void HandleError(string error)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                StopTypingEffect();
+                RemoveToolCallStatus(statusBorder);
+                UpdateLastAgentMessage(messageBorder.Item1, $"错误: {error}");
+            });
+        }
+
+        void HandleComplete()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                StopTypingEffect();
+                RemoveToolCallStatus(statusBorder);
+                UpdateTokenUsageDisplay();
+            });
+        }
+
+        _agentService.OnStreamingResponse += HandleStreaming;
+        _agentService.OnToolCallStart += HandleToolCallStart;
+        _agentService.OnError += HandleError;
+        _agentService.OnComplete += HandleComplete;
 
         try
         {
-            await _agentService.SendMessageAsync(fullMessage);
+            await _agentService.SendMessageAsync(userMessage);
         }
         catch (Exception ex)
         {
             Dispatcher.Invoke(() =>
             {
                 StopTypingEffect();
-                UpdateLastAgentMessage(lastAssistantMessage.Item1, $"错误: {ex.Message}");
+                RemoveToolCallStatus(statusBorder);
+                UpdateLastAgentMessage(messageBorder.Item1, $"错误: {ex.Message}");
             });
         }
+    }
+
+    private async Task<bool> HandleConfirmHighRiskCommand(string command)
+    {
+        var result = System.Windows.MessageBox.Show(
+            $"⚠️ AI请求执行以下高风险命令：\n\n{command}\n\n是否允许执行？",
+            "高风险命令确认",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        return result == System.Windows.MessageBoxResult.Yes;
+    }
+
+    private IEnumerable<string> GetAiWorkFolderFiles()
+    {
+        var settings = AgentSettings.Load();
+        if (string.IsNullOrEmpty(settings.AiWorkFolder))
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        try
+        {
+            if (Directory.Exists(settings.AiWorkFolder))
+            {
+                return Directory.GetFiles(settings.AiWorkFolder);
+            }
+        }
+        catch { }
+
+        return Enumerable.Empty<string>();
+    }
+
+    private void UpdateTokenUsageDisplay()
+    {
+        if (_agentService == null) return;
+
+        Dispatcher.Invoke(() =>
+        {
+            var totalTokens = _agentService.TotalTokens;
+            var maxTokens = _agentService.MaxTokenLimit;
+            var percentage = _agentService.TokenUsagePercentage;
+
+            TokenUsageText.Text = $"上下文: {totalTokens:N0} / {maxTokens:N0}";
+            TokenPercentageText.Text = $" ({percentage:F1}%)";
+
+            if (percentage >= 90)
+            {
+                TokenPercentageText.Foreground = new SolidColorBrush(Color.FromRgb(255, 59, 48));
+            }
+            else if (percentage >= 70)
+            {
+                TokenPercentageText.Foreground = new SolidColorBrush(Color.FromRgb(255, 149, 0));
+            }
+            else
+            {
+                TokenPercentageText.Foreground = new SolidColorBrush(Color.FromRgb(142, 142, 147));
+            }
+        });
+    }
+
+    private void HandleContextSummarized(string summary)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            UpdateTokenUsageDisplay();
+        });
+    }
+
+    private async void SummarizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_agentService == null)
+        {
+            var settings = AgentSettings.Load();
+            if (string.IsNullOrEmpty(settings.ApiKey))
+            {
+                ShowToast("请先在设置中配置API Key");
+                return;
+            }
+            _agentService = new AgentService(settings);
+            _agentService.GetStagingFilesCallback = () => _viewModel.ClipboardItems;
+            _agentService.GetAiWorkFolderFilesCallback = () => GetAiWorkFolderFiles();
+            _agentService.OnContextSummarized += HandleContextSummarized;
+            _agentService.OnConfirmHighRiskCommand += HandleConfirmHighRiskCommand;
+        }
+
+        if (_agentService.MessageCount == 0)
+        {
+            ShowToast("没有上下文可以总结喵~");
+            return;
+        }
+
+        AddAgentMessage("正在手动触发上下文总结...", false);
+        var summary = await _agentService.SummarizeContextAsync();
+        AddAgentMessage($"✅ 总结完成！\n{summary}", false);
+        UpdateTokenUsageDisplay();
     }
 
     private void StartTypingEffect()
@@ -526,10 +750,9 @@ public partial class MainWindow : Window
         _isTyping = true;
         _displayedResponse = "";
 
-        // Create a timer for typing effect - 30ms per character for smooth animation
         _typingTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(25)
+            Interval = TimeSpan.FromMilliseconds(15)
         };
         _typingTimer.Tick += TypingTimer_Tick;
         _typingTimer.Start();
@@ -571,8 +794,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Display more characters (speed up by showing multiple chars at once)
-        int charsToAdd = Math.Min(3, targetLength - currentLength);
+        int charsToAdd = Math.Min(5, targetLength - currentLength);
         _displayedResponse = _pendingResponse.Substring(0, currentLength + charsToAdd);
 
         // Update the display

@@ -20,16 +20,46 @@ public class AgentService
     private readonly List<Message> _conversationHistory = new();
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly string _logFilePath;
+    private readonly WebScraperService _webScraper;
+    private readonly WeatherService _weatherService;
+    private readonly string[] _highRiskPatterns = new[]
+    {
+        @"rm\s+-rf", @"del\s+/[fq]", @"format", @"diskpart", @"reg\s+delete",
+        @"shutdown", @"restart", @"stop-computer", @"kill\s+", @"taskkill",
+        @"remove-item\s+-recurse", @"rmdir", @"chmod\s+777", @"icacls\s+.*\/grant",
+        @"net\s+user", @"net\s+localgroup", @"powershell.*-enc", @"invoke-expression",
+        @"downloadstring", @"downloadfile", @"webclient", @"invoke-webrequest.*-outfile",
+        @"set-executionpolicy", @"new-service", @"new-scheduledtask"
+    };
+
+    public Func<IEnumerable<ClipboardItem>>? GetStagingFilesCallback { get; set; }
+    public Func<IEnumerable<string>>? GetAiWorkFolderFilesCallback { get; set; }
+    public string AiWorkFolder => _settings.AiWorkFolder;
+    public bool EnableShellExecution => _settings.EnableShellExecution;
+
+    public int MessageCount => _conversationHistory.Count;
+    public int TotalTokens { get; private set; }
+
+    private const int MaxTokens = 100000;
+
+    public double TokenUsagePercentage => MaxTokens > 0 ? (TotalTokens * 100.0 / MaxTokens) : 0;
+    public int MaxTokenLimit => MaxTokens;
 
     public event Action<string>? OnStreamingResponse;
     public event Action? OnComplete;
     public event Action<string>? OnError;
     public event Action<string>? OnToolCallStart;
+    public event Action? OnToolCallComplete;
+    public event Action<int, int>? OnTokenUsageUpdated;
+    public event Action<string>? OnContextSummarized;
+    public event Func<string, Task<bool>>? OnConfirmHighRiskCommand;
 
     public AgentService(AgentSettings settings)
     {
         _settings = settings;
         _httpClient = new HttpClient();
+        _webScraper = new WebScraperService();
+        _weatherService = new WeatherService();
         if (!string.IsNullOrEmpty(_settings.ApiKey))
         {
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_settings.ApiKey}");
@@ -102,6 +132,149 @@ public class AgentService
     public void ClearHistory()
     {
         _conversationHistory.Clear();
+        TotalTokens = 0;
+    }
+
+    private int EstimateTokens(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+        int chineseChars = 0;
+        int otherChars = 0;
+        foreach (char c in text)
+        {
+            if (c >= 0x4E00 && c <= 0x9FFF)
+                chineseChars++;
+            else
+                otherChars++;
+        }
+        return chineseChars / 2 + (otherChars + 3) / 4;
+    }
+
+    public bool CheckAndClearContextIfFull()
+    {
+        if (TotalTokens >= MaxTokens)
+        {
+            _conversationHistory.Clear();
+            TotalTokens = 0;
+            return true;
+        }
+        return false;
+    }
+
+    public bool ShouldSummarize => TotalTokens >= MaxTokens * 0.95;
+
+    public async Task<string> SummarizeContextAsync()
+    {
+        if (_conversationHistory.Count == 0)
+        {
+            return "没有上下文需要总结喵~";
+        }
+
+        if (string.IsNullOrEmpty(_settings.ApiKey))
+        {
+            return "API Key未配置，无法进行总结喵~";
+        }
+
+        Log("[DEBUG] 开始总结上下文...");
+
+        var summaryPrompt = @"请简洁地总结以上对话的要点，保留关键信息、用户需求和重要结论。直接给出总结内容，不需要开场白。";
+
+        var messagesToSummarize = new List<Message>();
+        var systemContent = BuildSystemPrompt();
+        if (!string.IsNullOrEmpty(systemContent))
+        {
+            messagesToSummarize.Add(new Message { Role = "system", Content = systemContent });
+        }
+        messagesToSummarize.AddRange(_conversationHistory);
+        messagesToSummarize.Add(new Message { Role = "user", Content = summaryPrompt });
+
+        var requestBody = new ChatRequest
+        {
+            Model = _settings.Model,
+            Messages = messagesToSummarize,
+            Stream = false
+        };
+
+        var json = JsonSerializer.Serialize(requestBody, _jsonOptions);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{_settings.BaseUrl}/chat/completions")
+            {
+                Content = content
+            };
+
+            var response = await _httpClient.SendAsync(request);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Log($"[ERROR] 总结请求失败: {errorContent}");
+                return $"总结失败: {errorContent}";
+            }
+
+            var responseData = await response.Content.ReadAsStringAsync();
+            
+            using var jsonDoc = JsonDocument.Parse(responseData);
+            var choices = jsonDoc.RootElement.GetProperty("choices");
+            if (choices.GetArrayLength() > 0)
+            {
+                var message = choices[0].GetProperty("message");
+                if (message.TryGetProperty("content", out var contentElement))
+                {
+                    var summary = contentElement.GetString();
+                    if (!string.IsNullOrEmpty(summary))
+                    {
+                        Log($"[DEBUG] 总结完成，长度: {summary.Length}");
+                        ApplySummary(summary);
+                        OnContextSummarized?.Invoke(summary);
+                        return summary;
+                    }
+                }
+            }
+
+            return "无法生成总结喵~";
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 总结上下文时出错: {ex.Message}");
+            return $"总结出错: {ex.Message}";
+        }
+    }
+
+    private void ApplySummary(string summary)
+    {
+        _conversationHistory.Clear();
+        
+        var summaryMessage = $"【对话总结】\n{summary}";
+        _conversationHistory.Add(new Message { Role = "system", Content = summaryMessage });
+        
+        UpdateTokenCount();
+        Log($"[DEBUG] 总结已应用，剩余token: {TotalTokens}");
+    }
+
+    private void UpdateTokenCount()
+    {
+        int tokens = 0;
+        foreach (var msg in _conversationHistory)
+        {
+            if (!string.IsNullOrEmpty(msg.Content))
+            {
+                tokens += EstimateTokens(msg.Content);
+            }
+            if (msg.ToolCalls != null)
+            {
+                foreach (var tc in msg.ToolCalls)
+                {
+                    if (!string.IsNullOrEmpty(tc.Function?.Name))
+                        tokens += EstimateTokens(tc.Function.Name);
+                    if (!string.IsNullOrEmpty(tc.Function?.Arguments))
+                        tokens += EstimateTokens(tc.Function.Arguments);
+                }
+            }
+        }
+        TotalTokens = tokens;
     }
 
     public void AddUserMessage(string content)
@@ -211,15 +384,35 @@ public class AgentService
     private List<Message> BuildMessages()
     {
         var messages = new List<Message>();
-        
+
+        var systemContent = BuildSystemPrompt();
+        if (!string.IsNullOrEmpty(systemContent))
+        {
+            messages.Add(new Message { Role = "system", Content = systemContent });
+        }
+
+        messages.AddRange(_conversationHistory);
+
+        UpdateTokenCount();
+
+        return messages;
+    }
+
+    private string BuildSystemPrompt()
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrEmpty(_settings.PersonaPrompt))
+        {
+            parts.Add(_settings.PersonaPrompt.Trim());
+        }
+
         if (!string.IsNullOrEmpty(_settings.SystemPrompt))
         {
-            messages.Add(new Message { Role = "system", Content = _settings.SystemPrompt });
+            parts.Add(_settings.SystemPrompt.Trim());
         }
-        
-        messages.AddRange(_conversationHistory);
-        
-        return messages;
+
+        return string.Join("\n\n", parts);
     }
 
     private List<ToolDefinition> GetToolDefinitions()
@@ -309,13 +502,96 @@ public class AgentService
                         Type = "object",
                         Properties = new Dictionary<string, PropertySchema>
                         {
-                            ["query"] = new PropertySchema 
-                            { 
-                                Type = "string", 
-                                Description = "搜索关键词" 
+                            ["query"] = new PropertySchema
+                            {
+                                Type = "string",
+                                Description = "搜索关键词"
                             }
                         },
                         Required = new List<string> { "query" }
+                    }
+                }
+            },
+            new ToolDefinition
+            {
+                Type = "function",
+                Function = new FunctionDefinition
+                {
+                    Name = "list_staging_files",
+                    Description = "列出用户剪贴板暂存区中的所有文件。",
+                    Parameters = new ToolParameters
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, PropertySchema>
+                        {
+                        },
+                        Required = new List<string> { }
+                    }
+                }
+            },
+            new ToolDefinition
+            {
+                Type = "function",
+                Function = new FunctionDefinition
+                {
+                    Name = "get_weather",
+                    Description = "查询指定城市的天气信息，包括温度、天气状况、风力等。",
+                    Parameters = new ToolParameters
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, PropertySchema>
+                        {
+                            ["city"] = new PropertySchema
+                            {
+                                Type = "string",
+                                Description = "要查询天气的城市名称，例如：北京、上海、广州、深圳、杭州等"
+                            }
+                        },
+                        Required = new List<string> { "city" }
+                    }
+                }
+            },
+            new ToolDefinition
+            {
+                Type = "function",
+                Function = new FunctionDefinition
+                {
+                    Name = "execute_shell",
+                    Description = "执行CMD或PowerShell命令。某些高风险命令（如删除文件、格式化磁盘等）需要用户确认才能执行。",
+                    Parameters = new ToolParameters
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, PropertySchema>
+                        {
+                            ["command"] = new PropertySchema
+                            {
+                                Type = "string",
+                                Description = "要执行的命令，例如：Get-Process、dir、ls 等"
+                            },
+                            ["shell"] = new PropertySchema
+                            {
+                                Type = "string",
+                                Description = "Shell类型，可选值为 'cmd' 或 'powershell'，默认为 'powershell'"
+                            }
+                        },
+                        Required = new List<string> { "command" }
+                    }
+                }
+            },
+            new ToolDefinition
+            {
+                Type = "function",
+                Function = new FunctionDefinition
+                {
+                    Name = "list_ai_work_folder",
+                    Description = "列出AI专用工作文件夹中的所有文件。这个文件夹中的文件会自动添加到剪贴板暂存区，方便用户快速访问AI生成的文件。",
+                    Parameters = new ToolParameters
+                    {
+                        Type = "object",
+                        Properties = new Dictionary<string, PropertySchema>
+                        {
+                        },
+                        Required = new List<string> { }
                     }
                 }
             }
@@ -381,7 +657,7 @@ public class AgentService
                                 foreach (var toolCall in toolCalls)
                                 {
                                     Log($"[DEBUG] 执行工具: {toolCall.Function.Name}");
-                                    var toolResult = ExecuteToolCall(toolCall.Function.Name, toolCall.Function.Arguments);
+                                    var toolResult = await ExecuteToolCallAsync(toolCall.Function.Name, toolCall.Function.Arguments);
                                     Log($"[DEBUG] 工具执行完成，结果: {toolResult.Substring(0, Math.Min(100, toolResult.Length))}...");
 
                                     // 添加 Assistant 的 tool_call 消息
@@ -400,8 +676,10 @@ public class AgentService
                                         Content = toolResult,
                                         ToolCallId = toolCall.Id
                                     });
+
+                                    OnToolCallComplete?.Invoke();
                                 }
-                                
+
                                 Log("[DEBUG] 准备继续请求（包含工具结果）");
                                 var continueRequest = new ChatRequest
                                 {
@@ -532,7 +810,7 @@ public class AgentService
                                         foreach (var toolCall in toolCalls)
                                         {
                                             Log($"[DEBUG] 执行工具: {toolCall.Function.Name}");
-                                            var toolResult = ExecuteToolCall(toolCall.Function.Name, toolCall.Function.Arguments);
+                                            var toolResult = await ExecuteToolCallAsync(toolCall.Function.Name, toolCall.Function.Arguments);
                                             Log($"[DEBUG] 工具执行完成");
 
                                             var toolCallMessage = new Message
@@ -549,8 +827,10 @@ public class AgentService
                                                 Content = toolResult,
                                                 ToolCallId = toolCall.Id
                                             });
+
+                                            OnToolCallComplete?.Invoke();
                                         }
-                                        
+
                                         Log("[DEBUG] 准备继续请求（包含工具结果）");
                                         var continueRequest = new ChatRequest
                                         {
@@ -600,7 +880,7 @@ public class AgentService
             Log($"[DEBUG] OnComplete 已调用");
         }
 
-    private string ExecuteToolCall(string toolName, string arguments)
+    private async Task<string> ExecuteToolCallAsync(string toolName, string arguments)
     {
         try
         {
@@ -703,10 +983,76 @@ public class AgentService
                             return "query参数为空";
                         }
                         Log($"[DEBUG] 搜索网络: {searchQuery}");
-                        return $"联网搜索功能需要配置支持搜索的API喵~ 当前API不支持搜索nya~";
+                        OnToolCallStart?.Invoke("search_web");
+                        var searchResult = await SearchWebAsync(searchQuery);
+                        Log("[DEBUG] 搜索完成");
+                        return searchResult;
                     }
                     Log("[ERROR] 缺少query参数");
                     return "缺少query参数";
+
+                case "list_staging_files":
+                    Log("[DEBUG] 列出暂存区文件");
+                    OnToolCallStart?.Invoke("list_staging_files");
+                    var stagingFiles = GetStagingFilesList();
+                    Log("[DEBUG] 暂存区文件列表完成");
+                    return stagingFiles;
+
+                case "get_weather":
+                    if (args.TryGetValue("city", out var cityArg))
+                    {
+                        var city = cityArg.GetString() ?? "";
+                        if (string.IsNullOrEmpty(city))
+                        {
+                            Log("[ERROR] city参数为空");
+                            return "city参数为空";
+                        }
+                        Log($"[DEBUG] 查询天气: {city}");
+                        OnToolCallStart?.Invoke("get_weather");
+                        var weatherResult = await _weatherService.GetWeatherAsync(city);
+                        Log("[DEBUG] 天气查询完成");
+                        return weatherResult;
+                    }
+                    Log("[ERROR] 缺少city参数");
+                    return "缺少city参数";
+
+                case "execute_shell":
+                    if (args.TryGetValue("command", out var commandArg))
+                    {
+                        var command = commandArg.GetString() ?? "";
+                        var shell = "powershell";
+                        if (args.TryGetValue("shell", out var shellArg))
+                        {
+                            shell = shellArg.GetString() ?? "powershell";
+                        }
+                        
+                        if (string.IsNullOrEmpty(command))
+                        {
+                            Log("[ERROR] command参数为空");
+                            return "command参数为空";
+                        }
+                        
+                        if (!EnableShellExecution)
+                        {
+                            return "Shell执行功能未启用，请在设置中启用Shell执行功能喵~";
+                        }
+                        
+                        Log($"[DEBUG] 执行Shell命令: {command} (shell: {shell})");
+                        OnToolCallStart?.Invoke("execute_shell");
+                        
+                        var result = await ExecuteShellCommandAsync(command, shell);
+                        Log("[DEBUG] Shell命令执行完成");
+                        return result;
+                    }
+                    Log("[ERROR] 缺少command参数");
+                    return "缺少command参数";
+
+                case "list_ai_work_folder":
+                    Log("[DEBUG] 列出AI工作文件夹");
+                    OnToolCallStart?.Invoke("list_ai_work_folder");
+                    var workFolderResult = GetAiWorkFolderFiles();
+                    Log("[DEBUG] AI工作文件夹列出完成");
+                    return workFolderResult;
 
                 default:
                     Log($"[ERROR] 未知工具: {toolName}");
@@ -796,7 +1142,7 @@ public class AgentService
                         });
                         
                         // 执行工具并添加结果
-                        var toolResult = ExecuteToolCall(toolCallName, toolCallArgs);
+                        var toolResult = await ExecuteToolCallAsync(toolCallName, toolCallArgs);
                         
                         _conversationHistory.Add(new Message 
                         {
@@ -1018,21 +1364,94 @@ public class AgentService
             {
                 return "图片文件不存在喵~";
             }
-            
+
             var ext = Path.GetExtension(imagePath).ToLower();
             var imageExts = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico" };
-            
+
             if (!imageExts.Contains(ext))
             {
                 return "不支持的图片格式喵~";
             }
-            
+
             var fileInfo = new FileInfo(imagePath);
             return $"🖼️ 图片: {Path.GetFileName(imagePath)}\n📏 大小: {fileInfo.Length / 1024.0:F2} KB\n📍 路径: {imagePath}";
         }
         catch (Exception ex)
         {
             return $"读取图片信息失败: {ex.Message}";
+        }
+    }
+
+    public async Task<string> SearchWebAsync(string query)
+    {
+        try
+        {
+            Log($"[DEBUG] 开始搜索并抓取: {query}");
+
+            OnToolCallStart?.Invoke("search_web");
+
+            var result = await _webScraper.SearchAndScrapeAsync(query, maxResults: 3);
+
+            if (result.ScrapedPages.Count == 0)
+            {
+                return $"未找到关于「{query}」的相关信息喵~";
+            }
+
+            var formattedResult = _webScraper.FormatForAI(result);
+            Log($"[DEBUG] 搜索抓取完成，找到 {result.ScrapedPages.Count} 个页面");
+
+            return formattedResult;
+        }
+        catch (HttpRequestException ex)
+        {
+            Log($"[ERROR] 网络请求失败: {ex.Message}");
+            return $"❌ 搜索失败：网络连接错误喵~ {ex.Message}";
+        }
+        catch (TaskCanceledException)
+        {
+            Log("[ERROR] 搜索超时");
+            return "❌ 搜索超时，请稍后重试喵~";
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 搜索异常: {ex.Message}");
+            return $"❌ 搜索失败：{ex.Message}";
+        }
+    }
+
+    private string GetStagingFilesList()
+    {
+        try
+        {
+            if (GetStagingFilesCallback == null)
+            {
+                return "暂存区功能暂不可用喵~ 请稍后再试nya~";
+            }
+
+            var items = GetStagingFilesCallback();
+            var fileItems = items.Where(i => i.ItemType == ClipboardItemType.File).ToList();
+
+            if (fileItems.Count == 0)
+            {
+                return "暂存区目前没有任何文件喵~ 你可以复制一些文件过来nya~ 🐾";
+            }
+
+            var result = "📁 暂存区文件列表：\n\n";
+            for (int i = 0; i < fileItems.Count; i++)
+            {
+                var item = fileItems[i];
+                var fileName = item.DisplayText;
+                var filePath = item.FilePaths?.FirstOrDefault() ?? "未知路径";
+                result += $"{i + 1}. 📄 **{fileName}**\n   📍 {filePath}\n\n";
+            }
+
+            result += $"共 {fileItems.Count} 个文件喵~ 🐾";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 获取暂存区文件失败: {ex.Message}");
+            return $"❌ 获取暂存区文件失败: {ex.Message}";
         }
     }
 
@@ -1054,6 +1473,160 @@ public class AgentService
         catch
         {
             return true;
+        }
+    }
+
+    private bool IsHighRiskCommand(string command)
+    {
+        var lowerCommand = command.ToLower();
+        foreach (var pattern in _highRiskPatterns)
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(lowerCommand, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private async Task<string> ExecuteShellCommandAsync(string command, string shellType)
+    {
+        try
+        {
+            if (IsHighRiskCommand(command))
+            {
+                if (OnConfirmHighRiskCommand != null)
+                {
+                    var confirmed = await OnConfirmHighRiskCommand.Invoke(command);
+                    if (!confirmed)
+                    {
+                        return "❌ 用户取消了高风险命令的执行喵~";
+                    }
+                }
+                else
+                {
+                    return "❌ 高风险命令需要用户确认，但确认回调未设置喵~";
+                }
+            }
+
+            var psi = new System.Diagnostics.ProcessStartInfo();
+            
+            if (shellType.ToLower() == "cmd")
+            {
+                psi.FileName = "cmd.exe";
+                psi.Arguments = $"/c {command}";
+            }
+            else
+            {
+                psi.FileName = "powershell.exe";
+                psi.Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{command.Replace("\"", "\\\"")}\"";
+            }
+
+            psi.UseShellExecute = false;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            psi.CreateNoWindow = true;
+            psi.StandardOutputEncoding = System.Text.Encoding.UTF8;
+            psi.StandardErrorEncoding = System.Text.Encoding.UTF8;
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null)
+            {
+                return "❌ 无法启动进程喵~";
+            }
+
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+            var completedTask = await Task.WhenAny(Task.WhenAll(outputTask, errorTask), timeoutTask);
+
+            if (completedTask == timeoutTask)
+            {
+                process.Kill(true);
+                return "❌ 命令执行超时（30秒）喵~";
+            }
+
+            await process.WaitForExitAsync();
+
+            var output = await outputTask;
+            var error = await errorTask;
+
+            var result = "";
+            if (!string.IsNullOrWhiteSpace(output))
+            {
+                result += $"📤 输出:\n{output}";
+            }
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                if (!string.IsNullOrWhiteSpace(result))
+                    result += "\n\n";
+                result += $"❌ 错误:\n{error}";
+            }
+
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                result = "✅ 命令执行成功，无输出喵~";
+            }
+
+            result += $"\n\n📊 退出码: {process.ExitCode}";
+
+            return result;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Log($"[ERROR] Shell执行失败: {ex.Message}");
+            return $"❌ Shell执行失败: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 执行命令异常: {ex.Message}");
+            return $"❌ 执行命令异常: {ex.Message}";
+        }
+    }
+
+    private string GetAiWorkFolderFiles()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(AiWorkFolder))
+            {
+                return "AI工作文件夹未设置喵~ 请在设置中配置AI工作文件夹nya~";
+            }
+
+            if (!Directory.Exists(AiWorkFolder))
+            {
+                return $"AI工作文件夹不存在nya~: {AiWorkFolder}";
+            }
+
+            var files = Directory.GetFiles(AiWorkFolder);
+            var dirs = Directory.GetDirectories(AiWorkFolder);
+
+            if (files.Length == 0 && dirs.Length == 0)
+            {
+                return "AI工作文件夹是空的喵~ 你可以在这里生成一些文件 nya~";
+            }
+
+            var result = $"📁 AI工作文件夹: {AiWorkFolder}\n\n";
+
+            foreach (var dir in dirs)
+            {
+                result += $"📂 {Path.GetFileName(dir)}/\n";
+            }
+
+            foreach (var file in files)
+            {
+                var fileInfo = new FileInfo(file);
+                result += $"📄 {Path.GetFileName(file)} ({fileInfo.Length / 1024.0:F1} KB)\n";
+            }
+
+            result += $"\n共 {dirs.Length} 个文件夹，{files.Length} 个文件喵~ 🐾";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Log($"[ERROR] 获取AI工作文件夹失败: {ex.Message}");
+            return $"❌ 获取AI工作文件夹失败: {ex.Message}";
         }
     }
 

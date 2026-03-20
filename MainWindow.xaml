@@ -286,6 +286,7 @@
                         <RowDefinition Height="38"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" Background="#FFFFFF" CornerRadius="0,16,0,0" MouseLeftButtonDown="AgentTitleBar_MouseLeftButtonDown">
@@ -334,7 +335,36 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Border Grid.Row="2" Background="#FFFFFF" CornerRadius="0,0,16,0" Padding="10" BorderBrush="#E5E5E5" BorderThickness="0,1,0,0">
+                    <Border x:Name="TokenUsageBorder" Grid.Row="2" Background="#F5F5F7" Padding="10,6" BorderBrush="#E5E5E5" BorderThickness="0,1,0,0" Visibility="Visible">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="TokenUsageText" Text="上下文: 0 / 100000" FontSize="10" Foreground="#8E8E93" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TokenPercentageText" Text=" (0%)" FontSize="10" Foreground="#8E8E93" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                            </StackPanel>
+                            <Button x:Name="SummarizeButton" Grid.Column="1" Content="总结" FontSize="10" 
+                                    Padding="8,2" Background="#E8E8E8" BorderThickness="0" Cursor="Hand" 
+                                    Click="SummarizeButton_Click" ToolTip="手动触发上下文总结">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#D0D0D0"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3" Background="#FFFFFF" CornerRadius="0,0,16,0" Padding="10" BorderBrush="#E5E5E5" BorderThickness="0,1,0,0" Margin="0,0,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

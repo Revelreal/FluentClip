@@ -117,9 +117,13 @@
 
                     <TextBlock Text="人格设定" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,20,0,12"/>
 
-                    <TextBlock Text="System Prompt" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
-                    <TextBox x:Name="SystemPromptTextBox" FontSize="12" Padding="10,8" Background="White" BorderBrush="#E8E8E8" BorderThickness="1" 
-                             TextWrapping="Wrap" AcceptsReturn="True" Height="100" Margin="0,0,0,20"/>
+                    <TextBlock Text="人格提示词 (可编辑)" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
+                    <TextBox x:Name="PersonaPromptTextBox" FontSize="12" Padding="10,8" Background="White" BorderBrush="#E8E8E8" BorderThickness="1"
+                             TextWrapping="Wrap" AcceptsReturn="True" Height="80" Margin="0,0,0,20"/>
+
+                    <TextBlock Text="系统提示词 (固定，不可修改)" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
+                    <TextBox x:Name="SystemPromptTextBox" FontSize="12" Padding="10,8" Background="#F5F5F5" BorderBrush="#E8E8E8" BorderThickness="1"
+                             TextWrapping="Wrap" AcceptsReturn="True" Height="100" IsReadOnly="True" Foreground="#666666" Margin="0,0,0,20"/>
 
                     <TextBlock Text="头像设置" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
 
@@ -128,6 +132,32 @@
                             Cursor="Hand" HorizontalAlignment="Left" Margin="0,0,0,8"/>
 
                     <TextBlock x:Name="AvatarPathText" FontSize="11" Foreground="#8E8E93" Margin="0,0,0,20"/>
+                    
+                    <TextBlock Text="高级功能" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
+                    
+                    <TextBlock Text="AI工作文件夹" FontSize="12" Foreground="#6E6E73" Margin="0,0,0,6"/>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="AiWorkFolderTextBox" Grid.Column="0" FontSize="12" Padding="10,8" Background="White" BorderBrush="#E8E8E8" BorderThickness="1" Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" x:Name="BrowseAiWorkFolderButton" Content="浏览" Click="BrowseAiWorkFolderButton_Click"
+                                FontSize="11" Padding="10,8" Background="#E8E8E8" Foreground="#3D3D3D" BorderThickness="0" Cursor="Hand"/>
+                    </Grid>
+                    <TextBlock Text="设置后，该文件夹中的文件会自动添加到剪贴板暂存区" FontSize="10" Foreground="#8E8E93" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="启用Shell命令执行" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
+                            <TextBlock Text="允许AI执行CMD/PowerShell命令（高风险命令需要确认）" FontSize="10" Foreground="#8E8E93" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <CheckBox x:Name="EnableShellExecutionCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand" VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

@@ -150,23 +150,23 @@
                     <StackPanel Margin="0,0,0,20">
                         <Grid Margin="0,0,0,10">
                             <TextBlock Text="显示主窗口" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
-                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="10,5">
+                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="8,4">
                                 <TextBox x:Name="ShowHotkeyTextBox" FontSize="12" BorderThickness="0" Background="Transparent" 
-                                         Width="100" Foreground="#3D3D3D" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
+                                         Width="90" Foreground="#3D3D3D" TextAlignment="Center" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
                             </Border>
                         </Grid>
                         <Grid Margin="0,0,0,10">
                             <TextBlock Text="打开设置" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
-                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="10,5">
+                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="8,4">
                                 <TextBox x:Name="SettingsHotkeyTextBox" FontSize="12" BorderThickness="0" Background="Transparent" 
-                                         Width="100" Foreground="#3D3D3D" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
+                                         Width="90" Foreground="#3D3D3D" TextAlignment="Center" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
                             </Border>
                         </Grid>
                         <Grid>
                             <TextBlock Text="置顶切换" FontSize="12" Foreground="#3D3D3D" VerticalAlignment="Center"/>
-                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="10,5">
+                            <Border HorizontalAlignment="Right" Background="White" CornerRadius="6" BorderBrush="#E8E8E8" BorderThickness="1" Padding="8,4">
                                 <TextBox x:Name="PinHotkeyTextBox" FontSize="12" BorderThickness="0" Background="Transparent" 
-                                         Width="100" Foreground="#3D3D3D" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
+                                         Width="90" Foreground="#3D3D3D" TextAlignment="Center" PreviewKeyDown="HotkeyTextBox_PreviewKeyDown" PreviewGotKeyboardFocus="HotkeyTextBox_PreviewGotKeyboardFocus"/>
                             </Border>
                         </Grid>
                     </StackPanel>
