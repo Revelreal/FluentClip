@@ -1,0 +1,48 @@
+<UserControl x:Class="FluentClip.BubblePopup"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="180" Height="70">
+    <UserControl.Resources>
+        <Storyboard x:Key="FadeIn">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                           From="0" To="1" Duration="0:0:0.3"/>
+            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                           From="10" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <QuadraticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Key="FadeOut" Completed="FadeOut_Completed">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                           From="1" To="0" Duration="0:0:0.5"/>
+        </Storyboard>
+    </UserControl.Resources>
+    
+    <Grid>
+        <Border x:Name="BubbleBorder"
+                Background="#E8F4FC"
+                CornerRadius="12"
+                Padding="12,8"
+                BorderBrush="#A8D8EA"
+                BorderThickness="1"
+                Opacity="0">
+            <Border.Effect>
+                <DropShadowEffect Color="#A8D8EA" BlurRadius="8" ShadowDepth="2" Opacity="0.4"/>
+            </Border.Effect>
+            <Border.RenderTransform>
+                <TranslateTransform/>
+            </Border.RenderTransform>
+            <StackPanel>
+                <TextBlock x:Name="EmojiText" Text="🐱" FontSize="16" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                <TextBlock x:Name="MessageText"
+                           Text="检测到新文件喵~"
+                           FontSize="12"
+                           Foreground="#5B7C99"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           FontFamily="Microsoft YaHei"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -27,6 +27,9 @@
     <Content Include="FluentClip帧动画素材\Attach\Attach_on.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="FluentClip帧动画素材\Grab\Grab.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

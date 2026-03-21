@@ -318,17 +318,26 @@
 
                     <ScrollViewer x:Name="AgentChatScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12">
                         <StackPanel x:Name="AgentChatPanel">
-                            <Border Background="White" CornerRadius="14" Padding="12" Margin="0,8" Effect="{StaticResource CardShadow}">
+                            <Border CornerRadius="16" Padding="14" Margin="0,8" Effect="{StaticResource CardShadow}">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FFF8F0" Offset="0"/>
+                                        <GradientStop Color="#F0F8FF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
                                 <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="28" Height="28" Margin="0,0,10,0">
-                                        <Ellipse.Fill>
-                                            <ImageBrush x:Name="AgentAvatar" ImageSource="/clip.ico" Stretch="UniformToFill"/>
-                                        </Ellipse.Fill>
-                                    </Ellipse>
+                                    <Border Width="36" Height="36" CornerRadius="18" Margin="0,0,12,0" ClipToBounds="True">
+                                        <Image x:Name="AgentAvatarImage" Stretch="UniformToFill"/>
+                                    </Border>
                                     <StackPanel>
-                                        <TextBlock Text="AI Agent" FontWeight="600" FontSize="12" Foreground="#1C1C1E"/>
-                                        <TextBlock Text="你好！我是AI助手，可以帮助你分析剪贴板内容。" 
-                                                  FontSize="11" Foreground="#3D3D3D" TextWrapping="Wrap" MaxWidth="180" Margin="0,2,0,0"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="🐱 猫羽雫" FontWeight="600" FontSize="13" Foreground="#6B4C9A"/>
+                                            <Border Background="#FFF0F5" CornerRadius="8" Padding="6,2" Margin="8,0,0,0">
+                                                <TextBlock Text="AI助手" FontSize="9" Foreground="#DB7093"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="你好呀~我是雫，一只可爱的小猫咪🐾 可以帮你分析剪贴板、聊天、搜索信息哦~有什么想问的尽管告诉我吧！" 
+                                                  FontSize="11" Foreground="#666666" TextWrapping="Wrap" MaxWidth="175" Margin="0,4,0,0" LineHeight="16"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

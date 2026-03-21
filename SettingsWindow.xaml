@@ -125,6 +125,10 @@
                         </Grid>
                     </StackPanel>
 
+                    <TextBlock Text="悬浮窗" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
+
+
+
                     <TextBlock Text="剪贴板" FontSize="13" FontWeight="600" Foreground="#1C1C1E" Margin="0,0,0,12"/>
 
                     <StackPanel Margin="0,0,0,20">

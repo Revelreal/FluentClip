@@ -62,6 +62,7 @@ public partial class SettingsWindow : Window
         ShowHotkeyTextBox.Text = _settings.ShowHotkey;
         SettingsHotkeyTextBox.Text = _settings.SettingsHotkey;
         PinHotkeyTextBox.Text = _settings.PinHotkey;
+        
     }
 
     private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
