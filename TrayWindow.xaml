@@ -1,0 +1,39 @@
+<Window x:Class="FluentClip.TrayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FluentClip悬浮窗"
+        Width="200" Height="267"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="True"
+        ResizeMode="NoResize"
+        Left="100" Top="100"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseMove="Window_MouseMove"
+        MouseLeftButtonUp="Window_MouseUp"
+        MouseEnter="Window_MouseEnter"
+        MouseLeave="Window_MouseLeave">
+
+    <Window.Resources>
+        <Storyboard x:Key="HoverAnimation">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                           From="0.8" To="1.0" Duration="0:0:0.2"/>
+        </Storyboard>
+        <Storyboard x:Key="LeaveAnimation">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                           From="1.0" To="0.8" Duration="0:0:0.2"/>
+        </Storyboard>
+    </Window.Resources>
+
+    <Grid x:Name="MainGrid">
+        <Image x:Name="TrayImage"
+               Stretch="Uniform"
+               Width="200" Height="267">
+            <Image.RenderTransform>
+                <RotateTransform x:Name="ImageRotation" CenterX="100" CenterY="133"/>
+            </Image.RenderTransform>
+        </Image>
+    </Grid>
+</Window>
