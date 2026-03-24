@@ -400,12 +400,12 @@
                                 </TextBox.Style>
                             </TextBox>
 
-                            <Button x:Name="AgentSendButton" Click="AgentSendButton_Click" Cursor="Hand" 
+                            <Button x:Name="AgentCancelButton" Click="AgentCancelButton_Click" Cursor="Hand" 
                                     Grid.Column="1"
-                                    Width="28" Height="28" Background="#E8E8E8" BorderThickness="0"
-                                    Margin="6,0,0,0">
-                                <Path Data="M2,21L23,12L2,3V10L17,12L2,14V21Z" 
-                                      Fill="#6E6E73" Width="12" Height="12" Stretch="Uniform"/>
+                                    Width="28" Height="28" Background="#FF3B30" BorderThickness="0"
+                                    Margin="6,0,0,0" Visibility="Collapsed">
+                                <Path Data="M6,6L18,18M18,6L6,18" 
+                                      Fill="White" Width="10" Height="10" Stretch="Uniform" Stroke="White" StrokeThickness="2"/>
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
@@ -413,7 +413,26 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="#D0D0D0"/>
+                                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <Button x:Name="AgentSendButton" Click="AgentSendButton_Click" Cursor="Hand" 
+                                    Grid.Column="1"
+                                    Width="28" Height="28" Background="#007AFF" BorderThickness="0"
+                                    Margin="6,0,0,0">
+                                <Path Data="M2,21L23,12L2,3V10L17,12L2,14V21Z" 
+                                      Fill="White" Width="12" Height="12" Stretch="Uniform"/>
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#0056B3"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>

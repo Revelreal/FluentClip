@@ -647,6 +647,34 @@ public partial class MainWindow : Window
         SendAgentMessage();
     }
 
+    private void AgentCancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_agentService != null && _agentService.IsProcessing)
+        {
+            _agentService.Cancel();
+            AddAgentMessage("⚠️ 对话已取消", false);
+            HideAgentCancelButton();
+        }
+    }
+
+    private void ShowAgentCancelButton()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            AgentCancelButton.Visibility = Visibility.Visible;
+            AgentSendButton.Visibility = Visibility.Collapsed;
+        });
+    }
+
+    private void HideAgentCancelButton()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            AgentCancelButton.Visibility = Visibility.Collapsed;
+            AgentSendButton.Visibility = Visibility.Visible;
+        });
+    }
+
     private async void SendAgentMessage()
     {
         var userMessage = AgentInputTextBox.Text.Trim();
@@ -656,6 +684,7 @@ public partial class MainWindow : Window
 
         AddAgentMessage(userMessage, true);
         AgentInputTextBox.Text = "";
+        ShowAgentCancelButton();
 
         var settings = AgentSettings.Load();
         if (string.IsNullOrEmpty(settings.ApiKey))
@@ -674,7 +703,6 @@ public partial class MainWindow : Window
             _agentService.OnShellOutput += HandleShellOutput;
             _agentService.OnShellError += HandleShellError;
             _agentService.OnShellComplete += HandleShellComplete;
-            _agentService.LoadChatHistory();
         }
 
         UpdateTokenUsageDisplay();
@@ -734,6 +762,7 @@ public partial class MainWindow : Window
                 StopTypingEffect();
                 RemoveToolCallStatus(statusBorder);
                 UpdateLastAgentMessage(messageBorder.Item1, $"错误: {error}");
+                HideAgentCancelButton();
             });
         }
 
@@ -745,6 +774,7 @@ public partial class MainWindow : Window
                 RemoveToolCallStatus(statusBorder);
                 UpdateTokenUsageDisplay();
                 ShowRandomTip();
+                HideAgentCancelButton();
             });
         }
 
@@ -962,7 +992,6 @@ public partial class MainWindow : Window
             _agentService.OnShellOutput += HandleShellOutput;
             _agentService.OnShellError += HandleShellError;
             _agentService.OnShellComplete += HandleShellComplete;
-            _agentService.LoadChatHistory();
         }
 
         if (_agentService.MessageCount > 0)

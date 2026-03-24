@@ -22,6 +22,8 @@ public class AgentService
     private readonly string _logFilePath;
     private readonly WebScraperService _webScraper;
     private readonly WeatherService _weatherService;
+    private CancellationTokenSource? _cancellationTokenSource;
+    private bool _isProcessing;
     private readonly string[] _highRiskPatterns = new[]
     {
         @"rm\s+-rf", @"del\s+/[fq]", @"format", @"diskpart", @"reg\s+delete",
@@ -361,6 +363,17 @@ public class AgentService
         _conversationHistory.Add(new Message { Role = "assistant", Content = content });
     }
 
+    public bool IsProcessing => _isProcessing;
+
+    public void Cancel()
+    {
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource.Cancel();
+            Log("[INFO] 用户取消了对话");
+        }
+    }
+
     public async Task SendMessageAsync(string userMessage, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_settings.ApiKey))
@@ -396,20 +409,30 @@ public class AgentService
         var json = JsonSerializer.Serialize(requestBody, _jsonOptions);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+        _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var linkedToken = _cancellationTokenSource.Token;
+        _isProcessing = true;
+
         try
         {
             if (_settings.UseStreaming)
             {
-                await SendStreamingRequestAsync(content, cancellationToken);
+                await SendStreamingRequestAsync(content, linkedToken);
             }
             else
             {
-                await SendNonStreamingRequestAsync(content, cancellationToken);
+                await SendNonStreamingRequestAsync(content, linkedToken);
             }
         }
         catch (Exception ex)
         {
             OnError?.Invoke($"请求失败: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessing = false;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
         }
     }
 
@@ -799,11 +822,22 @@ public class AgentService
                                     if (toolCallElement.TryGetProperty("id", out var idElement))
                                         id = idElement.GetString() ?? "";
                                     
-                                    // 如果没有 id，生成一个唯一 id
+                                    // 如果没有 id，使用工具名称和参数生成稳定的哈希id
+                                    JsonElement functionForHash = default;
                                     if (string.IsNullOrEmpty(id))
                                     {
-                                        id = $"call_{Guid.NewGuid():N}";
-                                        Log($"[DEBUG] 工具调用无id，生成唯一id: {id}");
+                                        var toolNameForHash = "";
+                                        var argsForHash = currentArgsBuffer.ToString();
+                                        if (toolCallElement.TryGetProperty("function", out functionForHash))
+                                        {
+                                            if (functionForHash.TryGetProperty("name", out var nameElement))
+                                                toolNameForHash = nameElement.GetString() ?? "";
+                                        }
+                                        var hashInput = $"{toolNameForHash}_{argsForHash}";
+                                        using var sha = System.Security.Cryptography.SHA256.Create();
+                                        var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(hashInput));
+                                        id = "call_" + Convert.ToHexString(hashBytes)[..16].ToLower();
+                                        Log($"[DEBUG] 工具调用无id，使用哈希生成id: {id}");
                                     }
                                     
                                     if (toolCallElement.TryGetProperty("function", out var functionElement))
@@ -1178,11 +1212,24 @@ public class AgentService
                         if (toolCall.TryGetProperty("id", out var id))
                             toolCallId = id.GetString() ?? "";
                         
-                        // 如果没有 id，生成一个唯一 id
+                        // 如果没有 id，使用工具名称和参数生成稳定的哈希id
+                        JsonElement functionForHash = default;
                         if (string.IsNullOrEmpty(toolCallId))
                         {
-                            toolCallId = $"call_{Guid.NewGuid():N}";
-                            Log($"[DEBUG] 工具调用无id，生成唯一id: {toolCallId}");
+                            var toolNameForHash = "";
+                            var argsForHash = "";
+                            if (toolCall.TryGetProperty("function", out functionForHash))
+                            {
+                                if (functionForHash.TryGetProperty("name", out var name))
+                                    toolNameForHash = name.GetString() ?? "";
+                                if (functionForHash.TryGetProperty("arguments", out var args))
+                                    argsForHash = args.GetString() ?? "";
+                            }
+                            var hashInput = $"{toolNameForHash}_{argsForHash}";
+                            using var sha = System.Security.Cryptography.SHA256.Create();
+                            var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(hashInput));
+                            toolCallId = "call_" + Convert.ToHexString(hashBytes)[..16].ToLower();
+                            Log($"[DEBUG] 工具调用无id，使用哈希生成id: {toolCallId}");
                         }
                         
                         if (toolCall.TryGetProperty("function", out var function))
