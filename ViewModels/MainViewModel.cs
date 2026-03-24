@@ -212,46 +212,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 else if (Clipboard.ContainsImage())
                 {
                     var image = Clipboard.GetImage();
-                    if (image != null)
+                    if (image != null && Clipboard.ContainsFileDropList())
                     {
-                        string[]? filePaths = null;
-                        
-                        if (Clipboard.ContainsFileDropList())
+                        var files = Clipboard.GetFileDropList();
+                        if (files != null && files.Count > 0)
                         {
-                            var files = Clipboard.GetFileDropList();
-                            if (files != null && files.Count > 0)
+                            var fileArray = new string[files.Count];
+                            files.CopyTo(fileArray, 0);
+                            if (System.IO.File.Exists(fileArray[0]))
                             {
-                                var fileArray = new string[files.Count];
-                                files.CopyTo(fileArray, 0);
-                                if (System.IO.File.Exists(fileArray[0]))
+                                var ext = System.IO.Path.GetExtension(fileArray[0])?.ToLowerInvariant();
+                                var imageExts = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".ico" };
+                                if (imageExts.Contains(ext))
                                 {
-                                    var ext = System.IO.Path.GetExtension(fileArray[0])?.ToLowerInvariant();
-                                    var imageExts = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".ico" };
-                                    if (imageExts.Contains(ext))
+                                    if (IsDuplicateImage(fileArray))
                                     {
-                                        filePaths = fileArray;
+                                        return;
                                     }
+                                    
+                                    var thumbnail = ThumbnailHelper.GenerateThumbnail(fileArray[0]);
+                                    
+                                    var item = new ClipboardItem
+                                    {
+                                        ItemType = ClipboardItemType.Image,
+                                        ImageContent = image,
+                                        Thumbnail = thumbnail,
+                                        FilePaths = fileArray,
+                                        Timestamp = DateTime.Now
+                                    };
+                                    ClipboardItems.Insert(0, item);
+                                    SaveStagingData();
                                 }
                             }
                         }
-                        
-                        if (filePaths != null && IsDuplicateImage(filePaths))
-                        {
-                            return;
-                        }
-                        
-                        var thumbnail = ThumbnailHelper.GenerateThumbnailFromImage(image);
-                        
-                        var item = new ClipboardItem
-                        {
-                            ItemType = ClipboardItemType.Image,
-                            ImageContent = image,
-                            Thumbnail = thumbnail,
-                            FilePaths = filePaths,
-                            Timestamp = DateTime.Now
-                        };
-                        ClipboardItems.Insert(0, item);
-                        SaveStagingData();
                     }
                 }
             }

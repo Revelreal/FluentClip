@@ -1406,17 +1406,22 @@ public partial class MainWindow : Window
                             System.Diagnostics.Process.Start("explorer.exe", $"\"{filePath}\"");
                         }
                     }
+                    else
+                    {
+                        ShowToast("⚠️ 文件已不存在，已从暂存区移除");
+                        _viewModel.DeleteItemCommand.Execute(_pendingClickItem);
+                    }
                 }
                 else if (_pendingClickItem.ItemType == ClipboardItemType.Text && !string.IsNullOrEmpty(_pendingClickItem.TextContent))
                 {
                     CopyTextToClipboardDirectly(_pendingClickItem.TextContent);
                     ShowCopySuccessToast();
                 }
-                else if (_pendingClickItem.ItemType == ClipboardItemType.Image && _pendingClickItem.ImageContent != null)
+                else if (_pendingClickItem.ItemType == ClipboardItemType.Image && _pendingClickItem.FilePaths?.Length > 0)
                 {
-                    if (_pendingClickItem.FilePaths?.Length > 0 && System.IO.File.Exists(_pendingClickItem.FilePaths[0]))
+                    var filePath = _pendingClickItem.FilePaths[0];
+                    if (System.IO.File.Exists(filePath))
                     {
-                        var filePath = _pendingClickItem.FilePaths[0];
                         var directory = System.IO.Path.GetDirectoryName(filePath);
                         if (!string.IsNullOrEmpty(directory))
                         {
@@ -1425,7 +1430,8 @@ public partial class MainWindow : Window
                     }
                     else
                     {
-                        ShowToast("⚠️ 未能找到文件路径，等待兼容性修复");
+                        ShowToast("⚠️ 文件已不存在，已从暂存区移除");
+                        _viewModel.DeleteItemCommand.Execute(_pendingClickItem);
                     }
                 }
                 else
