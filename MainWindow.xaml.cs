@@ -1414,8 +1414,20 @@ public partial class MainWindow : Window
                 }
                 else if (_pendingClickItem.ItemType == ClipboardItemType.Image && _pendingClickItem.ImageContent != null)
                 {
-                    _viewModel.CopyItemCommand.Execute(_pendingClickItem);
-                    ShowCopySuccessToast();
+                    if (_pendingClickItem.FilePaths?.Length > 0 && System.IO.File.Exists(_pendingClickItem.FilePaths[0]))
+                    {
+                        var filePath = _pendingClickItem.FilePaths[0];
+                        var directory = System.IO.Path.GetDirectoryName(filePath);
+                        if (!string.IsNullOrEmpty(directory))
+                        {
+                            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+                        }
+                    }
+                    else
+                    {
+                        _viewModel.CopyItemCommand.Execute(_pendingClickItem);
+                        ShowCopySuccessToast();
+                    }
                 }
                 else
                 {
