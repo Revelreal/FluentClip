@@ -214,6 +214,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     var image = Clipboard.GetImage();
                     if (image != null)
                     {
+                        string[]? filePaths = null;
+                        
+                        if (Clipboard.ContainsFileDropList())
+                        {
+                            var files = Clipboard.GetFileDropList();
+                            if (files != null && files.Count > 0)
+                            {
+                                var fileArray = new string[files.Count];
+                                files.CopyTo(fileArray, 0);
+                                if (System.IO.File.Exists(fileArray[0]))
+                                {
+                                    var ext = System.IO.Path.GetExtension(fileArray[0])?.ToLowerInvariant();
+                                    var imageExts = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".ico" };
+                                    if (imageExts.Contains(ext))
+                                    {
+                                        filePaths = fileArray;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (filePaths != null && IsDuplicateImage(filePaths))
+                        {
+                            return;
+                        }
+                        
                         var thumbnail = ThumbnailHelper.GenerateThumbnailFromImage(image);
                         
                         var item = new ClipboardItem
@@ -221,6 +247,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                             ItemType = ClipboardItemType.Image,
                             ImageContent = image,
                             Thumbnail = thumbnail,
+                            FilePaths = filePaths,
                             Timestamp = DateTime.Now
                         };
                         ClipboardItems.Insert(0, item);
@@ -246,6 +273,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             x.FilePaths != null && 
             x.FilePaths.Length == files.Length &&
             x.FilePaths.SequenceEqual(files));
+    }
+
+    private bool IsDuplicateImage(string[] filePaths)
+    {
+        if (filePaths == null || filePaths.Length == 0) return false;
+        return ClipboardItems.Any(x => 
+            (x.ItemType == ClipboardItemType.Image || x.ItemType == ClipboardItemType.File) &&
+            x.FilePaths != null && 
+            x.FilePaths.Length == filePaths.Length &&
+            x.FilePaths.SequenceEqual(filePaths));
     }
 
     private bool IsDuplicate(string text)
