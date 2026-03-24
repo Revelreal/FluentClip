@@ -161,4 +161,55 @@ public class ClipboardItem
             return "";
         }
     }
+
+    public string TextTypeFormat
+    {
+        get
+        {
+            if (ItemType != ClipboardItemType.Text || string.IsNullOrEmpty(TextContent))
+                return "";
+            
+            var text = TextContent.Trim();
+            
+            if (Uri.TryCreate(text, UriKind.Absolute, out var uri) && 
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                return "文本 | 链接";
+            }
+            
+            if (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                text.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return "文本 | 链接";
+            }
+            
+            if (text.StartsWith("#"))
+            {
+                return "文本 | Markdown标题";
+            }
+            
+            if (text.StartsWith("- ") || text.StartsWith("* ") || text.StartsWith("1. "))
+            {
+                return "文本 | Markdown列表";
+            }
+            
+            if (text.Contains("```"))
+            {
+                return "文本 | 代码";
+            }
+            
+            var codePatterns = new[] { "function ", "def ", "class ", "import ", "using ", "var ", "let ", "const ", "if (", "for (", "while (" };
+            if (codePatterns.Any(p => text.Contains(p)))
+            {
+                return "文本 | 代码";
+            }
+            
+            if (text.Length > 500)
+            {
+                return "文本 | 长文本";
+            }
+            
+            return "文本";
+        }
+    }
 }
