@@ -214,10 +214,35 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     var image = Clipboard.GetImage();
                     if (image != null)
                     {
+                        string[]? filePaths = null;
+                        
+                        if (Clipboard.ContainsFileDropList())
+                        {
+                            var files = Clipboard.GetFileDropList();
+                            if (files != null && files.Count > 0)
+                            {
+                                var fileArray = new string[files.Count];
+                                files.CopyTo(fileArray, 0);
+                                if (System.IO.File.Exists(fileArray[0]))
+                                {
+                                    var ext = System.IO.Path.GetExtension(fileArray[0])?.ToLowerInvariant();
+                                    var imageExts = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".ico" };
+                                    if (imageExts.Contains(ext))
+                                    {
+                                        filePaths = fileArray;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        var thumbnail = ThumbnailHelper.GenerateThumbnailFromImage(image);
+                        
                         var item = new ClipboardItem
                         {
                             ItemType = ClipboardItemType.Image,
                             ImageContent = image,
+                            Thumbnail = thumbnail,
+                            FilePaths = filePaths,
                             Timestamp = DateTime.Now
                         };
                         ClipboardItems.Insert(0, item);

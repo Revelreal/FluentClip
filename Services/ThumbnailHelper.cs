@@ -15,6 +15,23 @@ public static class ThumbnailHelper
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
 
+    public static BitmapSource? GenerateThumbnailFromImage(BitmapSource image, int width = 96, int height = 96)
+    {
+        try
+        {
+            var scaleX = width / image.Width;
+            var scaleY = height / image.Height;
+            var scale = Math.Min(scaleX, scaleY);
+            
+            var thumbnail = new TransformedBitmap(image, new ScaleTransform(scale, scale));
+            return thumbnail;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static BitmapSource? GenerateThumbnail(string filePath, int width = 128, int height = 128)
     {
         try
