@@ -238,6 +238,9 @@
                                                                     <DataTrigger Binding="{Binding ItemType}" Value="File">
                                                                         <Setter Property="Text" Value="{Binding FileTypeFormat}"/>
                                                                     </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ItemType}" Value="Image">
+                                                                        <Setter Property="Text" Value="{Binding FileTypeFormat}"/>
+                                                                    </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
