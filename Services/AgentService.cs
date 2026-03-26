@@ -895,63 +895,65 @@ public class AgentService
                                         Log($"[DEBUG] 续接参数片段: {argsChunk}");
                                     }
                                 }
-                                
-                                // 检查是否需要处理工具调用（finish_reason 为 tool_calls 时）
-                                if (finishReason == "tool_calls")
+                            }
+
+                            // 检查是否需要处理工具调用（finish_reason 为 tool_calls 时）
+                            // 这个检查必须在 if (delta.TryGetProperty("tool_calls")) 之外，
+                            // 因为 finish_reason 可能和 tool_calls 在不同的 chunk 中
+                            if (finishReason == "tool_calls")
+                            {
+                                Log("[DEBUG] finish_reason 为 tool_calls，准备处理工具调用");
+
+                                // 保存当前累积的工具调用
+                                if (currentToolCall != null && !string.IsNullOrEmpty(currentToolCall.Function.Name))
                                 {
-                                    Log("[DEBUG] finish_reason 为 tool_calls，准备处理工具调用");
-                                    
-                                    // 保存当前累积的工具调用
-                                    if (currentToolCall != null && !string.IsNullOrEmpty(currentToolCall.Function.Name))
+                                    currentToolCall.Function.Arguments = currentArgsBuffer.ToString();
+                                    toolCalls.Add(currentToolCall);
+                                    Log($"[DEBUG] 保存工具调用: {currentToolCall.Function.Name}");
+                                }
+                                currentToolCall = null;
+                                currentArgsBuffer.Clear();
+
+                                // 处理工具调用
+                                if (toolCalls.Count > 0)
+                                {
+                                    Log($"[DEBUG] 处理 {toolCalls.Count} 个工具调用");
+                                    foreach (var toolCall in toolCalls)
                                     {
-                                        currentToolCall.Function.Arguments = currentArgsBuffer.ToString();
-                                        toolCalls.Add(currentToolCall);
-                                        Log($"[DEBUG] 保存工具调用: {currentToolCall.Function.Name}");
-                                    }
-                                    currentToolCall = null;
-                                    currentArgsBuffer.Clear();
-                                    
-                                    // 处理工具调用
-                                    if (toolCalls.Count > 0)
-                                    {
-                                        Log($"[DEBUG] 处理 {toolCalls.Count} 个工具调用");
-                                        foreach (var toolCall in toolCalls)
+                                        Log($"[DEBUG] 执行工具: {toolCall.Function.Name}");
+                                        var toolResult = await ExecuteToolCallAsync(toolCall.Function.Name, toolCall.Function.Arguments);
+                                        Log($"[DEBUG] 工具执行完成");
+
+                                        var toolCallMessage = new Message
                                         {
-                                            Log($"[DEBUG] 执行工具: {toolCall.Function.Name}");
-                                            var toolResult = await ExecuteToolCallAsync(toolCall.Function.Name, toolCall.Function.Arguments);
-                                            Log($"[DEBUG] 工具执行完成");
-
-                                            var toolCallMessage = new Message
-                                            {
-                                                Role = "assistant",
-                                                Content = null,
-                                                ToolCalls = new List<ToolCall> { toolCall }
-                                            };
-                                            _conversationHistory.Add(toolCallMessage);
-
-                                            _conversationHistory.Add(new Message
-                                            {
-                                                Role = "tool",
-                                                Content = toolResult,
-                                                ToolCallId = toolCall.Id
-                                            });
-
-                                            OnToolCallComplete?.Invoke();
-                                        }
-
-                                        Log("[DEBUG] 准备继续请求（包含工具结果）");
-                                        var continueRequest = new ChatRequest
-                                        {
-                                            Model = _settings.Model,
-                                            Messages = BuildMessages(),
-                                            Tools = _settings.EnableToolCalls ? GetToolDefinitions() : null,
-                                            Stream = true
+                                            Role = "assistant",
+                                            Content = null,
+                                            ToolCalls = new List<ToolCall> { toolCall }
                                         };
-                                        var continueJson = JsonSerializer.Serialize(continueRequest, _jsonOptions);
-                                        var continueContent = new StringContent(continueJson, Encoding.UTF8, "application/json");
-                                        await SendStreamingRequestAsync(continueContent, cancellationToken);
-                                        return;
+                                        _conversationHistory.Add(toolCallMessage);
+
+                                        _conversationHistory.Add(new Message
+                                        {
+                                            Role = "tool",
+                                            Content = toolResult,
+                                            ToolCallId = toolCall.Id
+                                        });
+
+                                        OnToolCallComplete?.Invoke();
                                     }
+
+                                    Log("[DEBUG] 准备继续请求（包含工具结果）");
+                                    var continueRequest = new ChatRequest
+                                    {
+                                        Model = _settings.Model,
+                                        Messages = BuildMessages(),
+                                        Tools = _settings.EnableToolCalls ? GetToolDefinitions() : null,
+                                        Stream = true
+                                    };
+                                    var continueJson = JsonSerializer.Serialize(continueRequest, _jsonOptions);
+                                    var continueContent = new StringContent(continueJson, Encoding.UTF8, "application/json");
+                                    await SendStreamingRequestAsync(continueContent, cancellationToken);
+                                    return;
                                 }
                             }
                             else if (delta.TryGetProperty("content", out var contentElement))
