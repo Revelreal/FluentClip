@@ -25,11 +25,38 @@ using WpfDragDropEffects = System.Windows.DragDropEffects;
 using WpfDataObject = System.Windows.DataObject;
 using WpfOpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
-namespace FluentClip;
-
-public partial class MainWindow : Window
+namespace FluentClip
 {
-    private readonly MainViewModel _viewModel;
+    // Converters for filter bindings
+    public class FilterTypeToIndexConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return (int)(FilterType)value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return (FilterType)(int)value;
+        }
+    }
+
+    public class FilterDateToIndexConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return (int)(FilterDate)value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return (FilterDate)(int)value;
+        }
+    }
+
+    public partial class MainWindow : Window
+    {
+        private readonly MainViewModel _viewModel;
     private readonly AppSettings _settings;
     private readonly HotkeyManager _hotkeyManager;
     private Point _dragStartPoint;
@@ -53,6 +80,7 @@ public partial class MainWindow : Window
     private Border? _currentTypingBorder;
     private bool _isTyping;
     private bool _isToolCallInProgress = false;
+    private bool _isSendingMessage = false; // 防止并发发送消息
 
     private readonly TipDisplayService _tipDisplayService = new();
 
@@ -172,17 +200,23 @@ public partial class MainWindow : Window
     private bool IsValidFileType(string? ext)
     {
         if (string.IsNullOrEmpty(ext)) return false;
-        
-        var validExtensions = new[] 
-        { 
+
+        var validExtensions = new[]
+        {
+            // 文档
             ".txt", ".md", ".json", ".xml", ".cs", ".js", ".ts", ".tsx", ".jsx",
             ".html", ".css", ".py", ".java", ".c", ".cpp", ".h", ".hpp", ".go",
             ".rs", ".rb", ".php", ".sql", ".yaml", ".yml", ".ini", ".cfg",
             ".log", ".bat", ".ps1", ".sh", ".pdf", ".doc", ".docx",
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico",
+            // 图片
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico", ".svg", ".tiff",
+            // 音视频
+            ".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a",
+            ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+            // 压缩包
             ".zip", ".rar", ".7z", ".tar", ".gz"
         };
-        
+
         return validExtensions.Contains(ext);
     }
 
@@ -621,8 +655,16 @@ public partial class MainWindow : Window
 
     private async void SendAgentMessage()
     {
+        // 防止并发发送
+        if (_isSendingMessage) return;
+        _isSendingMessage = true;
+
         var userMessage = AgentInputTextBox.Text.Trim();
-        if (string.IsNullOrEmpty(userMessage)) return;
+        if (string.IsNullOrEmpty(userMessage))
+        {
+            _isSendingMessage = false;
+            return;
+        }
 
         StopTypingEffect();
 
@@ -647,6 +689,20 @@ public partial class MainWindow : Window
             _agentService.OnShellOutput += HandleShellOutput;
             _agentService.OnShellError += HandleShellError;
             _agentService.OnShellComplete += HandleShellComplete;
+            _agentService.OnAddStagingItemCallback = (item) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _viewModel.AddStagingItem(item);
+                });
+            };
+            _agentService.OnRemoveStagingItemCallback = (itemId) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _viewModel.RemoveStagingItem(itemId);
+                });
+            };
         }
 
         UpdateTokenUsageDisplay();
@@ -686,8 +742,6 @@ public partial class MainWindow : Window
                     _displayedResponse = "";
                     StartTypingEffect();
                 }
-
-                AgentChatScrollViewer.ScrollToEnd();
             });
         }
 
@@ -714,11 +768,13 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
+                _isSendingMessage = false;
                 StopTypingEffect();
                 RemoveToolCallStatus(statusBorder);
                 UpdateTokenUsageDisplay();
                 ShowRandomTip();
                 HideAgentCancelButton();
+                AgentChatScrollViewer.ScrollToEnd();
             });
         }
 
@@ -735,6 +791,7 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
+                _isSendingMessage = false;
                 StopTypingEffect();
                 RemoveToolCallStatus(statusBorder);
                 UpdateLastAgentMessage(messageBorder.Item1, $"错误: {ex.Message}");
@@ -755,7 +812,7 @@ public partial class MainWindow : Window
 
     private Border? _shellOutputBorder;
     private TextBlock? _shellOutputTextBlock;
-    private bool _isFirstShellOutput = true;
+    private StackPanel? _currentMessageWrapper;
 
     private void HandleShellOutput(string output)
     {
@@ -763,27 +820,28 @@ public partial class MainWindow : Window
         {
             if (_shellOutputBorder == null || _shellOutputTextBlock == null)
             {
+                // 从当前正在打字的消息获取其 StackPanel 包装器
+                if (_currentTypingBorder?.Parent is StackPanel wrapper)
+                {
+                    _currentMessageWrapper = wrapper;
+                }
+
                 var result = CreateShellOutputPanel();
                 _shellOutputBorder = result.border;
                 _shellOutputTextBlock = result.textBlock;
-            }
 
-            if (_isFirstShellOutput && AgentChatPanel.Children.Count > 0)
-            {
-                var lastChild = AgentChatPanel.Children[AgentChatPanel.Children.Count - 1];
-                if (lastChild is Border lastBorder)
+                // 将 Shell 输出添加到当前消息气泡内，而不是独立面板
+                if (_currentMessageWrapper != null)
                 {
-                    var lastContent = FindChild<TextBlock>(lastBorder, "AgentMessageText");
-                    if (lastContent != null && string.IsNullOrWhiteSpace(lastContent.Text))
-                    {
-                        AgentChatPanel.Children.Remove(lastBorder);
-                    }
+                    _currentMessageWrapper.Children.Add(_shellOutputBorder);
                 }
-                _isFirstShellOutput = false;
+                else
+                {
+                    AgentChatPanel.Children.Add(_shellOutputBorder);
+                }
             }
 
             _shellOutputTextBlock.Text += output;
-            AgentChatScrollViewer.ScrollToEnd();
         });
     }
 
@@ -794,7 +852,6 @@ public partial class MainWindow : Window
             if (_shellOutputBorder != null && _shellOutputTextBlock != null)
             {
                 _shellOutputTextBlock.Text += $"\n❌ {error}";
-                AgentChatScrollViewer.ScrollToEnd();
             }
         });
     }
@@ -803,9 +860,11 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(() =>
         {
-            _isFirstShellOutput = true;
             _shellOutputBorder = null;
             _shellOutputTextBlock = null;
+            _currentMessageWrapper = null;
+            // Shell 完成后再滚动到底部
+            AgentChatScrollViewer.ScrollToEnd();
         });
     }
 
@@ -833,7 +892,8 @@ public partial class MainWindow : Window
         };
 
         border.Child = textBlock;
-        AgentChatPanel.Children.Add(border);
+        // 注意：这里不要添加 border 到 AgentChatPanel
+        // 调用者负责将 border 添加到正确的容器中
 
         return (border, textBlock);
     }
@@ -936,6 +996,20 @@ public partial class MainWindow : Window
             _agentService.OnShellOutput += HandleShellOutput;
             _agentService.OnShellError += HandleShellError;
             _agentService.OnShellComplete += HandleShellComplete;
+            _agentService.OnAddStagingItemCallback = (item) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _viewModel.AddStagingItem(item);
+                });
+            };
+            _agentService.OnRemoveStagingItemCallback = (itemId) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _viewModel.RemoveStagingItem(itemId);
+                });
+            };
         }
 
         if (_agentService.MessageCount > 0)
@@ -1118,23 +1192,30 @@ public partial class MainWindow : Window
 
         if (_isTyping)
         {
-            var textBlock = new TextBlock
+            // 复用现有的 TextBlock，避免每次创建新的导致闪烁
+            if (targetBorder.Child is TextBlock existingTextBlock)
             {
-                Text = text,
-                FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromRgb(61, 61, 61)),
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 200,
-                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-                LineHeight = 20
-            };
-            targetBorder.Child = textBlock;
+                existingTextBlock.Text = text;
+            }
+            else
+            {
+                var textBlock = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Color.FromRgb(61, 61, 61)),
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 200,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                    LineHeight = 20
+                };
+                targetBorder.Child = textBlock;
+            }
         }
         else
         {
             targetBorder.Child = MarkdownRenderer.RenderWithThinking(text);
         }
-        AgentChatScrollViewer.ScrollToEnd();
     }
 
     private Border AddToolCallStatus(string text)
@@ -1655,4 +1736,5 @@ public partial class MainWindow : Window
             return _winFormsDataObject.GetFormats();
         }
     }
+}
 }

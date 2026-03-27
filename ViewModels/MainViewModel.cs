@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,6 +13,9 @@ using FluentClip.Models;
 using FluentClip.Services;
 
 namespace FluentClip.ViewModels;
+
+public enum FilterType { All, Text, Image, File }
+public enum FilterDate { All, Today, ThisWeek, ThisMonth }
 
 public partial class MainViewModel : ObservableObject, IDisposable
 {
@@ -21,13 +26,95 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private ObservableCollection<ClipboardItem> _clipboardItems = new();
 
+    [ObservableProperty]
+    private string _searchText = "";
+
+    [ObservableProperty]
+    private FilterType _selectedTypeFilter = FilterType.All;
+
+    [ObservableProperty]
+    private FilterDate _selectedDateFilter = FilterDate.All;
+
+    // CollectionView for efficient filtering
+    public ICollectionView FilteredItems { get; }
+
     public MainViewModel(AppSettings settings)
     {
         _settings = settings;
         _clipboardService = new ClipboardService();
         _clipboardService.ClipboardChanged += OnClipboardChanged;
+
+        // Initialize CollectionView for filtering
+        FilteredItems = CollectionViewSource.GetDefaultView(ClipboardItems);
+        FilteredItems.Filter = FilterPredicate;
+
         LoadStagingData();
     }
+
+    private bool FilterPredicate(object obj)
+    {
+        if (obj is not ClipboardItem item) return false;
+
+        // Type filter
+        if (SelectedTypeFilter != FilterType.All)
+        {
+            if (SelectedTypeFilter == FilterType.Text && item.ItemType != ClipboardItemType.Text) return false;
+            if (SelectedTypeFilter == FilterType.Image && item.ItemType != ClipboardItemType.Image) return false;
+            if (SelectedTypeFilter == FilterType.File && item.ItemType != ClipboardItemType.File) return false;
+        }
+
+        // Date filter
+        if (SelectedDateFilter != FilterDate.All)
+        {
+            var today = DateTime.Today;
+            switch (SelectedDateFilter)
+            {
+                case FilterDate.Today:
+                    if (item.Timestamp.Date != today) return false;
+                    break;
+                case FilterDate.ThisWeek:
+                    var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
+                    if (item.Timestamp.Date < startOfWeek || item.Timestamp.Date > today) return false;
+                    break;
+                case FilterDate.ThisMonth:
+                    if (item.Timestamp.Year != today.Year || item.Timestamp.Month != today.Month) return false;
+                    break;
+            }
+        }
+
+        // Search filter (fast contains search)
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var searchLower = SearchText.Trim().ToLowerInvariant();
+
+            // Search in DisplayText
+            if (item.DisplayText.Contains(searchLower, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Search in file paths
+            if (item.FilePaths != null)
+            {
+                foreach (var path in item.FilePaths)
+                {
+                    if (path.Contains(searchLower, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+
+            // Search in text content
+            if (!string.IsNullOrEmpty(item.TextContent) &&
+                item.TextContent.Contains(searchLower, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    partial void OnSearchTextChanged(string value) => FilteredItems.Refresh();
+    partial void OnSelectedTypeFilterChanged(FilterType value) => FilteredItems.Refresh();
+    partial void OnSelectedDateFilterChanged(FilterDate value) => FilteredItems.Refresh();
 
     public void LoadStagingData()
     {
@@ -40,6 +127,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 var clipboardItem = new ClipboardItem
                 {
+                    Id = stagingItem.Id,
                     ItemType = stagingItem.ItemType,
                     TextContent = stagingItem.TextContent,
                     Timestamp = stagingItem.Timestamp
@@ -100,6 +188,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 var stagingItem = new StagingItem
                 {
+                    Id = item.Id,
                     ItemType = item.ItemType,
                     TextContent = item.TextContent,
                     Timestamp = item.Timestamp,
@@ -119,6 +208,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             Log($"[ERROR] 保存暂存区数据失败: {ex.Message}");
+        }
+    }
+
+    public void AddStagingItem(ClipboardItem item)
+    {
+        if (item == null) return;
+
+        if (string.IsNullOrEmpty(item.Id))
+        {
+            item.Id = Guid.NewGuid().ToString();
+        }
+
+        ClipboardItems.Insert(0, item);
+        SaveStagingData();
+        Log($"[INFO] 已添加暂存区项目: {item.Id}");
+    }
+
+    public void RemoveStagingItem(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return;
+
+        var item = ClipboardItems.FirstOrDefault(x => x.Id == itemId);
+        if (item != null)
+        {
+            ClipboardItems.Remove(item);
+            SaveStagingData();
+            Log($"[INFO] 已移除暂存区项目: {itemId}");
         }
     }
 

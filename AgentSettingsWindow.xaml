@@ -158,6 +158,48 @@
                         </StackPanel>
                         <CheckBox x:Name="EnableShellExecutionCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand" VerticalAlignment="Center"/>
                     </Grid>
+
+                    <!-- MCP 设置区域 -->
+                    <Border Background="#FFF9E6" CornerRadius="8" Padding="12" Margin="0,0,0,12" BorderBrush="#FFE4B5" BorderThickness="1">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="启用 MCP（图片理解 &amp; 联网搜索）" FontSize="12" FontWeight="500" Foreground="#3D3D3D"/>
+                                    <TextBlock Text="需要 Python 和 uv 环境支持" FontSize="10" Foreground="#8E8E93" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="EnableMcpCheckBox" Style="{StaticResource ToggleSwitch}" Grid.Column="1" Cursor="Hand" VerticalAlignment="Center" Checked="EnableMcpCheckBox_Changed" Unchecked="EnableMcpCheckBox_Changed"/>
+                            </Grid>
+
+                            <!-- Node.js 状态显示 -->
+                            <Border x:Name="NodeStatusBorder" Background="#F5F5F5" CornerRadius="6" Padding="10" Margin="0,0,0,8" Visibility="Collapsed">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Ellipse x:Name="NodeStatusDot" Width="8" Height="8" Margin="0,0,6,0"/>
+                                        <TextBlock x:Name="NodeStatusText" FontSize="11" Foreground="#666666"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="NodeVersionText" FontSize="10" Foreground="#8E8E93" Visibility="Collapsed"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- MCP 操作按钮 -->
+                            <StackPanel x:Name="McpButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
+                                <Button x:Name="CheckNodeButton" Content="检测环境" Click="CheckNodeButton_Click"
+                                        FontSize="11" Padding="10,6" Background="White" BorderBrush="#E8E8E8" BorderThickness="1"
+                                        Cursor="Hand" Margin="0,0,8,0"/>
+                                <Button x:Name="InstallNodeButton" Content="自动安装" Click="InstallNodeButton_Click"
+                                        FontSize="11" Padding="10,6" Background="#007AFF" Foreground="White" BorderThickness="0"
+                                        Cursor="Hand"/>
+                            </StackPanel>
+
+                            <TextBlock x:Name="McpWarningText" Text="⚠️ 启用 MCP 需要 Python 和 uv 环境。如果未安装，点击「自动安装」。"
+                                       FontSize="10" Foreground="#CC6600" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

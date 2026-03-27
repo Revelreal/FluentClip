@@ -39,6 +39,10 @@
         <Style x:Key="EmojiText" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif"/>
         </Style>
+
+        <!-- Converters for filtering -->
+        <local:FilterTypeToIndexConverter x:Key="FilterTypeToIndexConverter"/>
+        <local:FilterDateToIndexConverter x:Key="FilterDateToIndexConverter"/>
     </Window.Resources>
 
     <Border x:Name="MainBorder" Background="#F9F9F9" CornerRadius="16" BorderBrush="#E5E5E5" BorderThickness="1">
@@ -172,6 +176,7 @@
                     <Grid Grid.Row="1" Margin="0,16,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -181,8 +186,101 @@
                                     Background="Transparent" BorderThickness="0" Foreground="#8E8E93" FontSize="12" Cursor="Hand"/>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="8,8,8,12">
-                            <ItemsControl ItemsSource="{Binding ClipboardItems}">
+                        <!-- Filter Controls -->
+                        <Grid Grid.Row="1" Margin="20,12,20,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Search Box -->
+                            <TextBox Grid.Row="0"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="12"
+                                     Padding="8,6"
+                                     BorderBrush="#E5E5E5"
+                                     BorderThickness="1"
+                                     Background="#F5F5F7">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TextBox">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="8">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="8,0,4,0" FontSize="12"/>
+                                                            <ScrollViewer x:Name="PART_ContentHost" Grid.Column="1" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+
+                            <!-- Filter Row -->
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Type Filter -->
+                                <ComboBox Grid.Column="0"
+                                          SelectedIndex="{Binding SelectedTypeFilter, Converter={StaticResource FilterTypeToIndexConverter}}"
+                                          FontSize="11"
+                                          Padding="8,4"
+                                          BorderBrush="#E5E5E5"
+                                          BorderThickness="1"
+                                          Background="#F5F5F7"
+                                          Width="90"
+                                          HorizontalAlignment="Left">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="文本"/>
+                                    <ComboBoxItem Content="图片"/>
+                                    <ComboBoxItem Content="文件"/>
+                                </ComboBox>
+
+                                <!-- Date Filter -->
+                                <ComboBox Grid.Column="1"
+                                          SelectedIndex="{Binding SelectedDateFilter, Converter={StaticResource FilterDateToIndexConverter}}"
+                                          FontSize="11"
+                                          Padding="8,4"
+                                          BorderBrush="#E5E5E5"
+                                          BorderThickness="1"
+                                          Background="#F5F5F7"
+                                          Width="90"
+                                          Margin="8,0,0,0"
+                                          HorizontalAlignment="Left">
+                                    <ComboBoxItem Content="全部时间"/>
+                                    <ComboBoxItem Content="今天"/>
+                                    <ComboBoxItem Content="本周"/>
+                                    <ComboBoxItem Content="本月"/>
+                                </ComboBox>
+
+                                <!-- Result Count -->
+                                <TextBlock Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="#8E8E93"
+                                           Margin="12,0,0,0">
+                                    <Run Text="{Binding FilteredItems.Count, Mode=OneWay}"/>
+                                    <Run Text=" 项"/>
+                                </TextBlock>
+                            </Grid>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="8,8,8,12">
+                            <ItemsControl ItemsSource="{Binding FilteredItems}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border x:Name="ItemCard" Background="#FFFFFF" CornerRadius="12"

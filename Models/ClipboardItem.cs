@@ -24,6 +24,7 @@ public enum FileCategory
 
 public class ClipboardItem
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString();
     public ClipboardItemType ItemType { get; set; }
     public string? TextContent { get; set; }
     public BitmapSource? ImageContent { get; set; }

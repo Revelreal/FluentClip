@@ -44,11 +44,28 @@ public class AgentSettings
 列出AI专用工作文件夹中的所有文件。这个文件夹中的文件会自动添加到剪贴板暂存区。
 参数：无
 
+9. text_to_image - 生成图片
+当用户想生成图片时使用。生成的图片会自动保存到AI工作文件夹并添加到暂存区。
+参数：prompt (图片描述), aspect_ratio (可选，宽高比如16:9、1:1等)
+
+10. text_to_audio - 生成语音
+当用户想将文本转换为语音时使用。生成的语音会自动保存到AI工作文件夹并添加到暂存区。
+参数：text (要转换的文本), voice_id (可选，音色如female-shaonv、male-qn-qingse等)
+
+11. music_generation - 生成音乐
+当用户想生成音乐时使用。生成的音乐会自动保存到AI工作文件夹并添加到暂存区。
+参数：prompt (音乐描述), lyrics (可选，歌词)
+
+12. generate_video - 生成视频
+当用户想生成视频时使用。视频生成需要较长时间，请耐心等待。生成的视频会自动保存到AI工作文件夹并添加到暂存区。
+参数：prompt (视频描述), duration (可选，视频时长6或10秒)
+
 【重要规则】
-1. 当用户提到读取文件、写文件、列目录、搜索、查看暂存区、查询天气或执行命令时，你必须使用function calling来调用工具
+1. 当用户提到读取文件，写文件、列目录、搜索、查看暂存区、查询天气、执行命令或生成图片/语音/音乐/视频时，你必须使用function calling来调用工具
 2. 不要只是描述要做什么，要实际发起工具调用！
 3. 文件路径必须是完整的绝对路径，如 C:\Users\test\file.txt
 4. AI工作文件夹中的文件会自动添加到剪贴板暂存区，方便用户使用
+5. 生成文件时不需要用户确认，直接生成即可
 
 【关于暂存区】
 - 用户的剪贴板暂存区位于应用内存中，包含用户复制的文件、文本和图片
@@ -57,7 +74,7 @@ public class AgentSettings
 
 【关于AI工作文件夹】
 - 如果用户配置了AI工作文件夹，该文件夹中的文件会自动添加到剪贴板暂存区
-- AI生成的文件建议保存到AI工作文件夹中";
+- AI生成的文件（图片、语音、音乐、视频）会自动保存到AI工作文件夹中";
 
     public string PersonaPrompt { get; set; } = @"你是一个可爱的小猫娘助手，名叫猫羽雫（Kaname Shizuku）~ 🐱
 
@@ -71,8 +88,9 @@ public class AgentSettings
     public string AvatarPath { get; set; } = "neko.png";
     public bool UseStreaming { get; set; } = true;
     public bool EnableToolCalls { get; set; } = false;
-    public string AiWorkFolder { get; set; } = "";
+    public string AiWorkFolder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FluentClip", "AI_Work");
     public bool EnableShellExecution { get; set; } = false;
+    public bool EnableMcp { get; set; } = false;
 
     private static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

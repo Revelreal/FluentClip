@@ -720,14 +720,19 @@ namespace FluentClip
 
         private async Task OnHeartbeatTick()
         {
+            System.Diagnostics.Debug.WriteLine($"[DEBUG] Heartbeat tick: falling={_isFalling}, attached={_isAttached}");
+
+            // 心跳只要悬浮窗可见就发送，不管状态
             if (!_isFalling && !_isAttached) return;
             if (_heartbeatRandom.Next(100) >= 25) return;
 
             try
             {
                 string topic = _heartbeatTopics[_heartbeatRandom.Next(_heartbeatTopics.Count)];
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Heartbeat searching: {topic}");
                 string searchResult = await SearchWebForHeartbeat(topic);
-                
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Heartbeat search result: {(string.IsNullOrEmpty(searchResult) ? "empty" : searchResult.Substring(0, Math.Min(50, searchResult.Length)))}");
+
                 if (!string.IsNullOrEmpty(searchResult))
                 {
                     string message = GenerateHeartbeatMessage(topic, searchResult);

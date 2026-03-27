@@ -9,10 +9,10 @@ namespace FluentClip
     public partial class BubbleWindow : Window
     {
         private DispatcherTimer? _hideTimer;
-        private const double BaseHeight = 60;
-        private const double TextHeight = 22;
-        private const double PaddingHeight = 40;
-        private const double MaxBubbleHeight = 400;
+        private const double CatEmojiHeight = 28;   // 猫 emoji 高度 + margin
+        private const double TextHeight = 20;       // 每行文字高度
+        private const double PaddingHeight = 50;    // Border padding + StackPanel margin
+        private const double MinBubbleHeight = 80;  // 最小高度
 
         public BubbleWindow()
         {
@@ -52,6 +52,8 @@ namespace FluentClip
 
         private void MeasureTextHeight(string message)
         {
+            double maxWidth = MessageText.MaxWidth > 0 ? MessageText.MaxWidth : 250;
+
             var formattedText = new FormattedText(
                 message,
                 System.Globalization.CultureInfo.CurrentCulture,
@@ -59,20 +61,21 @@ namespace FluentClip
                 new Typeface(MessageText.FontFamily, MessageText.FontStyle, MessageText.FontWeight, MessageText.FontStretch),
                 MessageText.FontSize,
                 MessageText.Foreground,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                VisualTreeHelper.GetDpi(this).PixelsPerDip)
+            {
+                MaxTextWidth = maxWidth
+            };
 
             double textWidth = formattedText.WidthIncludingTrailingWhitespace;
-            int lineCount = (int)Math.Ceiling(textWidth / 250);
+            int lineCount = (int)Math.Ceiling(textWidth / maxWidth);
             if (lineCount < 1) lineCount = 1;
 
-            double requiredHeight = PaddingHeight + (lineCount * TextHeight) + 10;
-            if (requiredHeight > MaxBubbleHeight)
+            // 计算总高度：猫 emoji + 文字行数 + padding
+            double requiredHeight = CatEmojiHeight + (lineCount * TextHeight) + PaddingHeight;
+
+            if (requiredHeight < MinBubbleHeight)
             {
-                requiredHeight = MaxBubbleHeight;
-            }
-            else if (requiredHeight < BaseHeight)
-            {
-                requiredHeight = BaseHeight;
+                requiredHeight = MinBubbleHeight;
             }
 
             Height = requiredHeight;
