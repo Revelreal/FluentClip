@@ -676,6 +676,8 @@ namespace FluentClip
         if (string.IsNullOrEmpty(settings.ApiKey))
         {
             AddAgentMessage("请先在设置中配置API Key。", false);
+            _isSendingMessage = false;
+            HideAgentCancelButton();
             return;
         }
 
@@ -1027,6 +1029,32 @@ namespace FluentClip
         var summary = await _agentService.SummarizeContextAsync();
         AddAgentMessage($"✅ 总结完成！\n{summary}", false);
         UpdateTokenUsageDisplay();
+    }
+
+    private void ClearChatButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_agentService == null)
+        {
+            ShowToast("AI服务未初始化");
+            return;
+        }
+
+        if (_agentService.MessageCount == 0)
+        {
+            ShowToast("没有聊天记录需要清除");
+            return;
+        }
+
+        _agentService.ClearHistory();
+        _agentService.SaveChatHistory();
+
+        if (AgentChatPanel != null)
+        {
+            AgentChatPanel.Children.Clear();
+        }
+
+        UpdateTokenUsageDisplay();
+        ShowToast("已清除聊天记录，AI对话已重启");
     }
 
     private void StartTypingEffect()

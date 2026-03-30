@@ -48,6 +48,7 @@ public class AgentService
     public int TotalTokens { get; private set; }
 
     private const int MaxTokens = 100000;
+    private const int RequestTimeoutSeconds = 60;
 
     public void LoadChatHistory()
     {
@@ -1090,16 +1091,23 @@ public class AgentService
                 Content = content
             };
 
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            
+            // 创建带超时的 CancellationToken
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(RequestTimeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            Log($"[DEBUG] 开始发送请求，超时时间: {RequestTimeoutSeconds}秒");
+
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
+            Log($"[DEBUG] 收到响应头，状态码: {response.StatusCode}");
+
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                var errorContent = await response.Content.ReadAsStringAsync(linkedCts.Token);
                 OnError?.Invoke($"API错误 ({response.StatusCode}): {errorContent}");
                 return;
             }
 
-            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
             using var reader = new StreamReader(stream);
 
             var fullResponse = new StringBuilder();
@@ -1110,9 +1118,9 @@ public class AgentService
             var currentToolCall = (ToolCall?)null;
             var currentArgsBuffer = new StringBuilder();
 
-            while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+            while ((line = await reader.ReadLineAsync(linkedCts.Token)) != null)
             {
-                if (cancellationToken.IsCancellationRequested)
+                if (linkedCts.Token.IsCancellationRequested)
                     break;
 
                 if (line.StartsWith("data: ") && line.Length > 6)
